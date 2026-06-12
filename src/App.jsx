@@ -5,9 +5,9 @@ import TrainingPlan from './pages/TrainingPlan'
 import Trends from './pages/Trends'
 import Settings from './pages/Settings'
 
-export default function App() {
+function App() {
   return (
-    <div className="min-h-screen bg-brand-bg">
+    <div className="min-h-screen bg-gray-900 text-gray-50 font-inter">
       <main className="pb-20">
         <Routes>
           <Route path="/" element={<Dashboard />} />
@@ -20,3 +20,5 @@ export default function App() {
     </div>
   )
 }
+
+export default App

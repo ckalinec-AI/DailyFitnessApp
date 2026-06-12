@@ -1,15 +1,14 @@
 {
   "name": "Kadence",
   "short_name": "Kadence",
-  "description": "Your daily fitness companion — training plans, recovery tracking, and performance trends.",
+  "description": "Your daily fitness companion",
   "theme_color": "#111827",
   "background_color": "#111827",
   "display": "standalone",
   "orientation": "portrait",
   "scope": "/",
   "start_url": "/",
-  "lang": "en-US",
-  "categories": ["fitness", "health", "sports"],
+  "categories": ["health", "fitness"],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -28,23 +27,6 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
-    }
-  ],
-  "screenshots": [],
-  "shortcuts": [
-    {
-      "name": "Dashboard",
-      "short_name": "Home",
-      "description": "View today's fitness dashboard",
-      "url": "/",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Training Plan",
-      "short_name": "Plan",
-      "description": "View your training plan",
-      "url": "/plan",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
