@@ -1,9 +1,10 @@
-import { STORAGE_PREFIX } from './constants'
+const NAMESPACE = 'kadence_'
 
 export function getItem(key, defaultValue = null) {
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + key)
-    return raw !== null ? JSON.parse(raw) : defaultValue
+    const raw = localStorage.getItem(NAMESPACE + key)
+    if (raw === null) return defaultValue
+    return JSON.parse(raw)
   } catch {
     return defaultValue
   }
@@ -11,25 +12,48 @@ export function getItem(key, defaultValue = null) {
 
 export function setItem(key, value) {
   try {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value))
+    localStorage.setItem(NAMESPACE + key, JSON.stringify(value))
+    return true
   } catch {
-    // localStorage unavailable (private browsing, quota exceeded)
+    return false
   }
 }
 
 export function removeItem(key) {
   try {
-    localStorage.removeItem(STORAGE_PREFIX + key)
+    localStorage.removeItem(NAMESPACE + key)
   } catch {
-    // ignore
+    // Ignore errors on remove
   }
 }
 
 export function clearAll() {
   try {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith(STORAGE_PREFIX))
-    keys.forEach(k => localStorage.removeItem(k))
+    const keysToRemove = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith(NAMESPACE)) {
+        keysToRemove.push(k)
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k))
   } catch {
-    // ignore
+    // Ignore errors
   }
+}
+
+export function getAll() {
+  const result = {}
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith(NAMESPACE)) {
+        const shortKey = k.slice(NAMESPACE.length)
+        result[shortKey] = getItem(shortKey)
+      }
+    }
+  } catch {
+    // Return partial result
+  }
+  return result
 }

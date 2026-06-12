@@ -1,56 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  html, body {
-    @apply bg-brand-bg text-brand-text font-sans;
+  html,
+  body {
+    @apply bg-gray-900 text-gray-50 font-inter;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overscroll-behavior: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  * {
-    box-sizing: border-box;
+    overscroll-behavior-y: none;
   }
 
   ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: transparent;
+    @apply bg-gray-900;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-brand-elevated rounded-full;
+    @apply bg-gray-700 rounded-full;
   }
 
-  input[type="number"]::-webkit-inner-spin-button,
-  input[type="number"]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-600;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #374151 #111827;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #root {
+    padding-top: env(safe-area-inset-top);
   }
 }
 
-@layer components {
-  .card {
-    @apply bg-brand-surface rounded-2xl border border-white/5;
+@layer utilities {
+  .font-inter {
+    font-family: 'Inter', sans-serif;
   }
 
-  .card-glow {
-    @apply card shadow-accent;
+  .text-gradient-blue {
+    background: linear-gradient(135deg, #3B82F6, #60A5FA);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  .btn-primary {
-    @apply bg-brand-accent text-white font-semibold rounded-xl px-4 py-2.5
-           active:opacity-80 transition-opacity;
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
   }
 
-  .label-sm {
-    @apply text-xs font-medium uppercase tracking-widest text-brand-muted;
-  }
-
-  .stat-number {
-    @apply font-bold tabular-nums tracking-tight;
+  .glow-blue-sm {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
   }
 }

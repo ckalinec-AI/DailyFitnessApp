@@ -1,79 +1,52 @@
-#!/usr/bin/env node
 /**
- * generate-icons.js
+ * Generate PNG icons from icon.svg
+ * Requires: npm install --save-dev sharp
  *
- * Generates PNG icon files for the Kadence PWA from the source SVG.
- *
- * Prerequisites:
- *   npm install --save-dev sharp
- *
- * Usage:
- *   node scripts/generate-icons.js
- *   # or via npm script:
- *   npm run generate-icons
- *
- * Output:
- *   public/icons/icon-192.png  — used in manifest + apple-touch-icon
- *   public/icons/icon-512.png  — used in manifest + splash screens
+ * Usage: node scripts/generate-icons.js
  */
 
-import { readFileSync, existsSync } from 'fs'
-import { resolve, dirname } from 'path'
+import { readFileSync, existsSync, mkdirSync } from 'fs'
 import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const ROOT = resolve(__dirname, '..')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const rootDir = join(__dirname, '..')
+const iconsDir = join(rootDir, 'public', 'icons')
 
-// ─── Icon sizes to generate ───────────────────────────────────────────────────
-const ICONS = [
-  { size: 192, output: 'public/icons/icon-192.png' },
-  { size: 512, output: 'public/icons/icon-512.png' },
-]
-
-const SVG_SOURCE = resolve(ROOT, 'public/icons/icon.svg')
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-async function main() {
-  // Verify source SVG exists
-  if (!existsSync(SVG_SOURCE)) {
-    console.error(`❌  Source SVG not found: ${SVG_SOURCE}`)
-    process.exit(1)
-  }
-
-  // Dynamically import sharp (optional devDependency)
+async function generateIcons() {
   let sharp
   try {
-    sharp = (await import('sharp')).default
+    const sharpModule = await import('sharp')
+    sharp = sharpModule.default
   } catch {
-    console.error('❌  sharp is not installed. Run: npm install --save-dev sharp')
+    console.error('sharp is not installed. Run: npm install --save-dev sharp')
     process.exit(1)
   }
 
-  const svgBuffer = readFileSync(SVG_SOURCE)
-  console.log(`📐  Source SVG: ${SVG_SOURCE}`)
-
-  for (const { size, output } of ICONS) {
-    const outputPath = resolve(ROOT, output)
-
-    try {
-      await sharp(svgBuffer)
-        .resize(size, size)
-        .png({
-          // High quality, reasonably compressed
-          compressionLevel: 9,
-          adaptiveFiltering: true,
-        })
-        .toFile(outputPath)
-
-      console.log(`✅  Generated ${size}×${size} → ${output}`)
-    } catch (err) {
-      console.error(`❌  Failed to generate ${output}:`, err.message)
-      process.exit(1)
-    }
+  if (!existsSync(iconsDir)) {
+    mkdirSync(iconsDir, { recursive: true })
   }
 
-  console.log('\n🎉  All icons generated successfully.')
-  console.log('   You can now commit the PNG files or add them to .gitignore.')
+  const svgPath = join(iconsDir, 'icon.svg')
+  if (!existsSync(svgPath)) {
+    console.error(`SVG not found at ${svgPath}`)
+    process.exit(1)
+  }
+
+  const svgBuffer = readFileSync(svgPath)
+  const sizes = [192, 512]
+
+  for (const size of sizes) {
+    const outputPath = join(iconsDir, `icon-${size}.png`)
+    await sharp(svgBuffer)
+      .resize(size, size)
+      .png()
+      .toFile(outputPath)
+    console.log(`Generated ${outputPath}`)
+  }
+
+  console.log('Icon generation complete!')
 }
 
-main()
+generateIcons().catch(console.error)
