@@ -1,0 +1,20 @@
+PNG icons must be generated before deploying.
+
+Run:
+  npm run generate-icons
+
+This will create:
+  - icon-192.png  (192×192 px)
+  - icon-512.png  (512×512 px)
+
+Both files are generated from public/icons/icon.svg using the
+scripts/generate-icons.js script (requires `sharp` to be installed).
+
+Until the PNGs exist the PWA manifest will still reference them — browsers
+and Lighthouse will warn, but the app will still run. The SVG icon
+(icon.svg) serves as the favicon in the meantime.
+
+To install sharp (not listed as a devDependency to keep CI lean):
+  npm install --save-dev sharp
+Then run:
+  npm run generate-icons

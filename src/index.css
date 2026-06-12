@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply bg-brand-bg text-brand-text font-sans;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-brand-elevated rounded-full;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-brand-surface rounded-2xl border border-white/5;
+  }
+
+  .card-glow {
+    @apply card shadow-accent;
+  }
+
+  .btn-primary {
+    @apply bg-brand-accent text-white font-semibold rounded-xl px-4 py-2.5
+           active:opacity-80 transition-opacity;
+  }
+
+  .label-sm {
+    @apply text-xs font-medium uppercase tracking-widest text-brand-muted;
+  }
+
+  .stat-number {
+    @apply font-bold tabular-nums tracking-tight;
+  }
+}
