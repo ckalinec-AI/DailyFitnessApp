@@ -1,24 +1,238 @@
+import { useMemo } from 'react'
+import { format } from 'date-fns'
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from 'recharts'
+import Card from '../components/ui/Card'
+import SectionHeader from '../components/ui/SectionHeader'
+import EmptyState from '../components/ui/EmptyState'
+import { getWorkoutForOffset, getDayOffset, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
+
+// ── Icons ──────────────────────────────────────────────────────────────────
+
+function HeartbeatIcon() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  )
+}
+
+function MoonIcon() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  )
+}
+
+// ── Section 1: Weight Trend ────────────────────────────────────────────────
+
+function WeightSection() {
+  const weightLog = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('kadence_weight_log') || '[]')
+    } catch {
+      return []
+    }
+  }, [])
+
+  const hasData = weightLog.length > 0
+  const first = hasData ? weightLog[0] : null
+  const last = hasData ? weightLog[weightLog.length - 1] : null
+  const delta = hasData && weightLog.length > 1
+    ? (last.weight - first.weight).toFixed(1)
+    : null
+
+  return (
+    <Card variant="default">
+      <SectionHeader title="Weight" />
+      {hasData ? (
+        <>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={weightLog} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis
+                dataKey="date"
+                tick={{ fill: '#4B5563', fontSize: 10 }}
+                tickFormatter={d => format(new Date(d + 'T00:00:00'), 'M/d')}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{ fill: '#4B5563', fontSize: 10 }}
+                domain={['dataMin - 3', 'dataMax + 3']}
+              />
+              <Tooltip
+                contentStyle={{ background: '#1F2937', border: '1px solid #374151', borderRadius: 8 }}
+                labelStyle={{ color: '#9CA3AF', fontSize: 11 }}
+                itemStyle={{ color: '#fff' }}
+                formatter={v => [`${v} lbs`, 'Weight']}
+              />
+              <Area
+                type="monotone"
+                dataKey="weight"
+                stroke="#3B82F6"
+                strokeWidth={2}
+                fill="url(#weightGrad)"
+                dot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div className="mt-2 flex items-center gap-3 text-sm">
+            <span className="text-white font-semibold">Current: {last.weight} lbs</span>
+            {delta !== null && (
+              <span className="text-gray-400">
+                Start: {first.weight} lbs &nbsp;·&nbsp; Δ {delta > 0 ? '+' : ''}{delta} lbs
+              </span>
+            )}
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          icon={
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          }
+          title="No weight data"
+          description="Log your weight on the Today screen to see your trend here"
+        />
+      )}
+    </Card>
+  )
+}
+
+// ── Section 2: HRV Trend ──────────────────────────────────────────────────
+
+function HRVSection() {
+  const whoopConnected = useMemo(
+    () => Boolean(localStorage.getItem('kadence_whoop_access_token')),
+    []
+  )
+
+  return (
+    <Card variant="default">
+      <SectionHeader title="HRV · 30 Days" />
+      {whoopConnected ? (
+        <EmptyState
+          icon={<HeartbeatIcon />}
+          title="No HRV data"
+          description="HRV data will appear here once Whoop syncs your readings"
+        />
+      ) : (
+        <EmptyState
+          icon={<HeartbeatIcon />}
+          title="No HRV data"
+          description="Connect your Whoop to see 30-day HRV trends"
+        />
+      )}
+    </Card>
+  )
+}
+
+// ── Section 3: Weekly Mileage ─────────────────────────────────────────────
+
+function MileageSection() {
+  const weekData = useMemo(() => {
+    const currentOffset = getDayOffset(PLAN_START_DATE_DEFAULT)
+    const currentWeek = Math.max(0, Math.floor(currentOffset / 7))
+    const data = []
+
+    for (let w = Math.max(0, currentWeek - 5); w <= currentWeek; w++) {
+      const weekStartOffset = w * 7
+      let planned = 0
+      for (let d = 0; d < 7; d++) {
+        const workout = getWorkoutForOffset(weekStartOffset + d)
+        const match = workout?.name?.match(/~(\d+)\s*mi/)
+        if (match) planned += parseInt(match[1], 10)
+      }
+      data.push({ week: `W${w + 1}`, planned, actual: 0 })
+    }
+
+    return data
+  }, [])
+
+  return (
+    <Card variant="default">
+      <SectionHeader title="Weekly Mileage" />
+      <ResponsiveContainer width="100%" height={140}>
+        <BarChart data={weekData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+          <XAxis dataKey="week" tick={{ fill: '#4B5563', fontSize: 10 }} />
+          <YAxis tick={{ fill: '#4B5563', fontSize: 10 }} />
+          <Tooltip
+            contentStyle={{ background: '#1F2937', border: '1px solid #374151', borderRadius: 8 }}
+            itemStyle={{ color: '#fff' }}
+          />
+          <Bar dataKey="planned" fill="#1D4ED8" opacity={0.5} radius={[3, 3, 0, 0]} name="Planned mi" />
+          <Bar dataKey="actual" fill="#3B82F6" radius={[3, 3, 0, 0]} name="Actual mi" />
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="mt-2 flex items-center gap-4 text-xs text-gray-400">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-800 opacity-50" />
+          Planned mi
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
+          Actual mi
+        </span>
+      </div>
+    </Card>
+  )
+}
+
+// ── Section 4: Sleep Trend ────────────────────────────────────────────────
+
+function SleepSection() {
+  const whoopConnected = useMemo(
+    () => Boolean(localStorage.getItem('kadence_whoop_access_token')),
+    []
+  )
+
+  return (
+    <Card variant="default">
+      <SectionHeader title="Sleep Score · 7 Days" />
+      {whoopConnected ? (
+        <EmptyState
+          icon={<MoonIcon />}
+          title="No sleep data"
+          description="Sleep data will appear here once Whoop syncs your readings"
+        />
+      ) : (
+        <EmptyState
+          icon={<MoonIcon />}
+          title="No sleep data"
+          description="Connect your Whoop to see 7-day sleep score trends"
+        />
+      )}
+    </Card>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────
+
 export default function Trends() {
   return (
-    <div className="min-h-screen bg-gray-900 px-4 py-8">
-      <div className="max-w-md mx-auto">
-        <h1 className="text-2xl font-bold text-gray-50 mb-2">Trends</h1>
-        <p className="text-gray-400 text-sm mb-8">Your fitness analytics</p>
-        <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-          <div className="flex items-center justify-center h-32">
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-blue-500">
-                  <path fillRule="evenodd" d="M2.25 13.5a8.25 8.25 0 0 1 8.25-8.25.75.75 0 0 1 .75.75v6.75H18a.75.75 0 0 1 .75.75 8.25 8.25 0 0 1-16.5 0Z" clipRule="evenodd" />
-                  <path fillRule="evenodd" d="M12.75 3a.75.75 0 0 1 .75-.75 8.25 8.25 0 0 1 8.25 8.25.75.75 0 0 1-.75.75h-7.5a.75.75 0 0 1-.75-.75V3Z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <p className="text-gray-400 text-sm font-medium">Coming soon</p>
-              <p className="text-gray-600 text-xs mt-1">Track your progress over time</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="px-4 pt-6 pb-8 space-y-4">
+      <h1 className="text-2xl font-black text-white tracking-tight mb-2">Trends</h1>
+      <WeightSection />
+      <HRVSection />
+      <MileageSection />
+      <SleepSection />
     </div>
   )
 }
