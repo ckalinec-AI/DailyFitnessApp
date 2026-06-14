@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import TrainingPlan from './pages/TrainingPlan'
 import Trends from './pages/Trends'
 import Settings from './pages/Settings'
+import WhoopCallback from './pages/WhoopCallback'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/plan" element={<TrainingPlan />} />
           <Route path="/trends" element={<Trends />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/whoop/callback" element={<WhoopCallback />} />
         </Routes>
       </main>
       <BottomNav />

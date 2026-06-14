@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts'
 import { usePlan } from '../hooks/usePlan'
+import { useWhoop } from '../hooks/useWhoop'
 import { HR_ZONES, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
 import { logWeight, getRecentEntries, getWeightChange } from '../lib/weight'
 import {
@@ -27,8 +28,14 @@ const intensityLabel = {
 export default function Dashboard() {
   const plan = usePlan()
 
-  // Mock Whoop data — replaced by live API in a later step
-  const recovery = { score: 74, hrv: 45, rhr: 58, sleepPct: 87, synced: 12 }
+  const whoop = useWhoop()
+  const recovery = whoop.connected && whoop.recoveryData ? {
+    score: whoop.recoveryData.score ?? 74,
+    hrv: whoop.recoveryData.hrv ?? 45,
+    rhr: whoop.recoveryData.rhr ?? 58,
+    sleepPct: whoop.sleepData?.sleepPct ?? 87,
+    synced: whoop.lastSyncedMins ?? 12,
+  } : { score: 74, hrv: 45, rhr: 58, sleepPct: 87, synced: null }
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
 
   // Weight tracking state
@@ -118,7 +125,12 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <p className="text-xs text-gray-600 mt-3">Last synced {recovery.synced} min ago · Connect Whoop</p>
+        <p className="text-xs text-gray-600 mt-3">
+          {whoop.connected
+            ? recovery.synced !== null ? `Last synced ${recovery.synced} min ago` : 'Syncing...'
+            : <button onClick={whoop.connect} className="text-blue-500 hover:text-blue-400 transition-colors">Connect Whoop →</button>
+          }
+        </p>
       </Card>
 
       {/* Today's workout */}

@@ -1,3 +1,8 @@
+# Note: Set these environment variables in the Netlify UI under Site Settings > Environment Variables:
+#   WHOOP_CLIENT_SECRET   — server-side Whoop OAuth secret (never expose in client code)
+#   VITE_WHOOP_CLIENT_ID  — Whoop OAuth client ID (safe to expose in client)
+#   VITE_WHOOP_REDIRECT_URI — must match the redirect URI registered in your Whoop app
+
 [build]
   command = "npm run build"
   publish = "dist"
@@ -12,6 +17,11 @@
 
 [[headers]]
   for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
