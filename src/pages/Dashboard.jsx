@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { format, differenceInCalendarDays } from 'date-fns'
 import { usePlan } from '../hooks/usePlan'
 import { useWhoop } from '../hooks/useWhoop'
 import { useIntervals } from '../hooks/useIntervals'
+import { useWeather } from '../hooks/useWeather'
 import {
   HR_ZONES,
   PLAN_START_DATE_DEFAULT,
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const plan = usePlan()
   const whoop = useWhoop()
   const { events, eventsByDate, activitiesByDate } = useIntervals()
+  const { weather, loading: weatherLoading, error: weatherError, refresh: refreshWeather } = useWeather()
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const todayEvent = eventsByDate[todayStr] ?? null
@@ -68,6 +70,32 @@ export default function Dashboard() {
   }
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
   const [todayExpanded, setTodayExpanded] = useState(false)
+
+  // Pull-to-refresh
+  const touchStartY = useRef(null)
+  const [pullDist, setPullDist] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+  const PULL_THRESHOLD = 72
+
+  const doRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await Promise.allSettled([whoop.syncData(), refreshWeather({ forceRefresh: true })])
+    setRefreshing(false)
+  }, [whoop, refreshWeather])
+
+  function onTouchStart(e) {
+    if (window.scrollY === 0) touchStartY.current = e.touches[0].clientY
+  }
+  function onTouchMove(e) {
+    if (touchStartY.current === null) return
+    const dist = Math.max(0, e.touches[0].clientY - touchStartY.current)
+    if (dist > 0) setPullDist(Math.min(dist, PULL_THRESHOLD * 1.5))
+  }
+  function onTouchEnd() {
+    if (pullDist >= PULL_THRESHOLD) doRefresh()
+    touchStartY.current = null
+    setPullDist(0)
+  }
 
   const nudge = (() => {
     if (!plan.todayDetails || nudgeDismissed || recovery.score == null) return null
@@ -140,7 +168,23 @@ export default function Dashboard() {
   }, [events, todayStr])
 
   return (
-    <div className="px-4 pt-6 pb-8 space-y-4">
+    <div
+      className="px-4 pt-6 pb-8 space-y-4"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      <div
+        className="overflow-hidden transition-all duration-200 flex items-center justify-center text-gray-500 text-xs gap-1.5"
+        style={{ height: refreshing ? 32 : pullDist > 8 ? Math.min(pullDist * 0.4, 32) : 0, opacity: refreshing || pullDist > 16 ? 1 : 0 }}
+      >
+        {refreshing ? (
+          <><span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full" /> Refreshing…</>
+        ) : (
+          <span>{pullDist >= PULL_THRESHOLD ? '↑ Release to refresh' : '↓ Pull to refresh'}</span>
+        )}
+      </div>
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -148,12 +192,6 @@ export default function Dashboard() {
           <h1 className="text-2xl font-black text-white tracking-tight">Kadence</h1>
           <p className="text-xs text-gray-400 mt-0.5">{format(new Date(), 'EEEE, MMM d')}</p>
         </div>
-        {weekNumber && (
-          <div className="text-right">
-            <p className="text-xs text-gray-500 uppercase tracking-wider">Week</p>
-            <p className="text-xl font-black text-blue-400">{weekNumber}</p>
-          </div>
-        )}
       </div>
 
       {/* Days to race countdown */}
@@ -210,6 +248,67 @@ export default function Dashboard() {
             : <button onClick={whoop.connect} className="text-blue-500 hover:text-blue-400 transition-colors">Connect Whoop →</button>
           }
         </p>
+      </Card>
+
+      {/* Weather card */}
+      <Card variant="default">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Weather</p>
+            {weatherLoading && !weather ? (
+              <p className="text-sm text-gray-500">Fetching weather…</p>
+            ) : weatherError && !weather ? (
+              <p className="text-sm text-yellow-600/80">{weatherError}</p>
+            ) : weather ? (
+              <>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-3xl leading-none">{weather.icon}</span>
+                  <div>
+                    <p className="text-2xl font-black text-white leading-none">{weather.tempF}°F</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{weather.condition}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-400">
+                  <span>💨 {weather.windMph} mph</span>
+                  <span>🌧 {weather.precipPct}% rain (next 6h)</span>
+                </div>
+              </>
+            ) : null}
+          </div>
+          {weather && (
+            <div className="text-right space-y-2 shrink-0">
+              <div className={[
+                'rounded-lg px-2.5 py-1 text-xs font-semibold',
+                weather.sunglasses === 'tinted'
+                  ? 'bg-yellow-500/15 text-yellow-300'
+                  : 'bg-white/5 text-gray-400',
+              ].join(' ')}>
+                🕶 {weather.sunglasses === 'tinted' ? 'Tinted lenses' : 'Clear lenses'}
+              </div>
+              <div className={[
+                'rounded-lg px-2.5 py-1 text-xs font-semibold',
+                weather.jacket
+                  ? 'bg-blue-500/15 text-blue-300'
+                  : 'bg-white/5 text-gray-400',
+              ].join(' ')}>
+                🧥 {weather.jacket ? 'Pack a jacket' : 'No jacket needed'}
+              </div>
+            </div>
+          )}
+        </div>
+        {weather && (
+          <div className="mt-2 border-t border-white/5 pt-2 flex items-center justify-between">
+            <p className="text-[10px] text-gray-700">
+              {weather.rainRisk === 'high' ? '⚠️ High rain risk' : weather.rainRisk === 'moderate' ? 'Moderate rain chance' : 'Ride conditions look good'}
+            </p>
+            <button
+              onClick={() => refreshWeather({ forceRefresh: true })}
+              className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+            >
+              {weatherLoading ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+        )}
       </Card>
 
       {/* Today's workout */}
