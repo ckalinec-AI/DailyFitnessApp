@@ -43,6 +43,13 @@ function degreesToCompass(deg) {
   return dirs[Math.round(deg / 45) % 8]
 }
 
+function cloudLabel(pct) {
+  if (pct < 20) return 'Clear'
+  if (pct < 60) return 'Partly Cloudy'
+  if (pct < 85) return 'Mostly Cloudy'
+  return 'Overcast'
+}
+
 function fmtTime(date) {
   const h = date.getHours() % 12 || 12
   const m = date.getMinutes()
@@ -155,7 +162,8 @@ export function useWeather({ rideDurationMins = 60 } = {}) {
         tempF:    Math.round(cur.temperature_2m),
         condition: wmo.label,
         icon:     wmo.icon,
-        cloudPct: Math.round(cur.cloud_cover ?? 0),
+        cloudPct:   Math.round(cur.cloud_cover ?? 0),
+        cloudLabel: cloudLabel(Math.round(cur.cloud_cover ?? 0)),
         windMph:  Math.round(cur.wind_speed_10m),
         windDir:  degreesToCompass(cur.wind_direction_10m ?? 0),
         // Store full 24-hour arrays so window can be recalculated without refetching

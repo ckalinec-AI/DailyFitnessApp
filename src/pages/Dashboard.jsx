@@ -291,10 +291,10 @@ export default function Dashboard() {
             </div>
 
             <div className="flex flex-col items-center gap-1.5">
-              <span className="text-xl font-black text-white leading-none">
-                {weather.cloudPct != null ? `${weather.cloudPct}%` : '—'}
+              <span className="text-sm font-black text-white leading-tight text-center">
+                {weather.cloudLabel ?? '—'}
               </span>
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Cloud</span>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Sky</span>
             </div>
 
             <div className="flex flex-col items-center gap-1.5">
