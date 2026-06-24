@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getItem, setItem } from '../lib/storage'
 
-const CACHE_KEY = 'kadence_weather_cache'
+const CACHE_KEY = 'kadence_weather_cache_v2'
 const LOCATION_KEY = 'kadence_weather_location'
 const CACHE_TTL_MS = 30 * 60 * 1000
 const LOCATION_TTL_MS = 12 * 60 * 60 * 1000

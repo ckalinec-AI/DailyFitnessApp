@@ -252,50 +252,54 @@ export default function Dashboard() {
 
       {/* Weather card */}
       <Card variant="default">
-        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Weather</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Weather</p>
+          <button
+            onClick={() => refreshWeather({ forceRefresh: true })}
+            className="text-[10px] text-gray-700 hover:text-gray-400 transition-colors"
+          >
+            {weatherLoading ? '…' : '↻'}
+          </button>
+        </div>
         {weatherLoading && !weather ? (
-          <p className="text-sm text-gray-500">Fetching weather…</p>
+          <p className="text-sm text-gray-500 text-center py-2">Fetching weather…</p>
         ) : weatherError && !weather ? (
-          <p className="text-sm text-yellow-600/80">{weatherError}</p>
+          <p className="text-sm text-yellow-600/80 text-center py-2">{weatherError}</p>
         ) : weather ? (
-          <div className="flex items-center gap-3">
-            {/* Condition */}
-            <span className="text-3xl leading-none shrink-0">{weather.icon}</span>
-            <div className="shrink-0">
-              <p className="text-2xl font-black text-white leading-none">{weather.tempF}°F</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">{weather.condition}</p>
+          <div className="flex justify-around items-start py-1">
+
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="flex items-center gap-1 leading-none">
+                <span className="text-lg leading-none">{weather.icon}</span>
+                <span className="text-xl font-black text-white leading-none">{weather.tempF}°</span>
+              </div>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest text-center leading-tight">{weather.condition}</span>
             </div>
 
-            <div className="h-8 w-px bg-white/8 mx-1 shrink-0" />
-
-            {/* Stats */}
-            <div className="flex items-center gap-4 flex-1 flex-wrap">
-              <div className="text-center">
-                <p className="text-sm font-bold text-white">{weather.cloudPct}%</p>
-                <p className="text-[10px] text-gray-500">Cloud</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-white">{weather.windMph} <span className="text-xs font-normal">mph</span></p>
-                <p className="text-[10px] text-gray-500">{weather.windDir} Wind</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-white">{weather.precipPct}%</p>
-                <p className="text-[10px] text-gray-500">Rain chance</p>
-              </div>
-              {weather.precipIn > 0 && (
-                <div className="text-center">
-                  <p className="text-sm font-bold text-white">{weather.precipIn}"</p>
-                  <p className="text-[10px] text-gray-500">Expected</p>
-                </div>
-              )}
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-xl font-black text-white leading-none">
+                {weather.cloudPct != null ? `${weather.cloudPct}%` : '—'}
+              </span>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Cloud</span>
             </div>
 
-            <button
-              onClick={() => refreshWeather({ forceRefresh: true })}
-              className="text-[10px] text-gray-700 hover:text-gray-400 transition-colors shrink-0"
-            >
-              {weatherLoading ? '…' : '↻'}
-            </button>
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-xl font-black text-white leading-none">{weather.windMph}<span className="text-xs font-semibold"> mph</span></span>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{weather.windDir} Wind</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-xl font-black text-white leading-none">{weather.precipPct}%</span>
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Rain</span>
+            </div>
+
+            {weather.precipIn > 0 && (
+              <div className="flex flex-col items-center gap-1.5">
+                <span className="text-xl font-black text-white leading-none">{weather.precipIn}"</span>
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Expected</span>
+              </div>
+            )}
+
           </div>
         ) : null}
       </Card>
