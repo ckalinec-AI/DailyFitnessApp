@@ -67,12 +67,12 @@ export async function refreshAccessToken(refreshToken) {
   return res.json()
 }
 
-// Whoop API base
-const API_BASE = 'https://api.prod.whoop.com/developer'
-
+// Proxy all Whoop API calls through Netlify to avoid CORS restrictions
 async function whoopFetch(path, accessToken) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+  const res = await fetch('/.netlify/functions/whoop-api', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, accessToken }),
   })
   if (!res.ok) {
     let detail = res.status
