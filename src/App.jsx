@@ -13,7 +13,6 @@ function App() {
         className="flex-1 overflow-y-auto min-h-0"
         style={{
           paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))',
           overscrollBehavior: 'none',
         }}
       >
