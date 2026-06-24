@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { getItem, setItem, removeItem } from '../lib/storage'
 import {
   buildAuthUrl, exchangeCode, refreshAccessToken,
-  fetchRecovery, fetchSleep, fetchCycle,
+  fetchRecovery, fetchSleep, fetchCycle, fetchBodyMeasurement,
 } from '../lib/whoop'
+import { logWeight } from '../lib/weight'
 
 export function useWhoop() {
   const [connected, setConnected] = useState(() => !!getItem('whoop_access_token', null))
@@ -12,6 +13,7 @@ export function useWhoop() {
   const [recoveryData, setRecoveryData] = useState(null)
   const [sleepData, setSleepData] = useState(null)
   const [strainData, setStrainData] = useState(null)
+  const [bodyData, setBodyData] = useState(() => getItem('whoop_body_cache', null))
   const refreshingRef = useRef(false)
 
   // Get a valid access token (refreshes if expired)
@@ -52,10 +54,12 @@ export function useWhoop() {
     removeItem('whoop_recovery_cache')
     removeItem('whoop_sleep_cache')
     removeItem('whoop_strain_cache')
+    removeItem('whoop_body_cache')
     setConnected(false)
     setRecoveryData(null)
     setSleepData(null)
     setStrainData(null)
+    setBodyData(null)
   }, [])
 
   const connect = useCallback(async () => {
@@ -70,15 +74,17 @@ export function useWhoop() {
       const token = await getValidToken()
       if (!token) { setLoading(false); return }
 
-      const [recResult, sleepResult, cycleResult] = await Promise.allSettled([
+      const [recResult, sleepResult, cycleResult, bodyResult] = await Promise.allSettled([
         fetchRecovery(token),
         fetchSleep(token),
         fetchCycle(token),
+        fetchBodyMeasurement(token),
       ])
 
       const rec   = recResult.status   === 'fulfilled' ? recResult.value   : null
       const sleep = sleepResult.status === 'fulfilled' ? sleepResult.value : null
       const cycle = cycleResult.status === 'fulfilled' ? cycleResult.value : null
+      const body  = bodyResult.status  === 'fulfilled' ? bodyResult.value  : null
 
       if (!rec && !sleep && !cycle) {
         const firstErr = [recResult, sleepResult, cycleResult]
@@ -122,6 +128,20 @@ export function useWhoop() {
         setStrainData(parsed)
         setItem('whoop_strain_cache', parsed)
       }
+
+      if (body?.weight_kilogram) {
+        const weightLbs = body.weight_kilogram * 2.20462
+        const parsed = {
+          weightLbs: parseFloat(weightLbs.toFixed(1)),
+          weightKg: body.weight_kilogram,
+          heightM: body.height_meter ?? null,
+          maxHR: body.max_heart_rate ?? null,
+        }
+        setBodyData(parsed)
+        setItem('whoop_body_cache', parsed)
+        // Auto-log today's weight so Trends chart builds a history
+        logWeight(weightLbs)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -137,6 +157,7 @@ export function useWhoop() {
     if (cachedRec) setRecoveryData(cachedRec)
     if (cachedSleep) setSleepData(cachedSleep)
     if (cachedStrain) setStrainData(cachedStrain)
+    // bodyData initialised directly from localStorage in useState above
 
     if (connected) syncData()
   }, [connected])
@@ -153,6 +174,7 @@ export function useWhoop() {
     recoveryData,
     sleepData,
     strainData,
+    bodyData,
     lastSyncedMins,
     connect,
     disconnect,

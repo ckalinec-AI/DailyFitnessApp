@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { format, differenceInCalendarDays } from 'date-fns'
-import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts'
 import { usePlan } from '../hooks/usePlan'
 import { useWhoop } from '../hooks/useWhoop'
 import { useIntervals } from '../hooks/useIntervals'
@@ -12,14 +11,11 @@ import {
   getWorkoutForOffset,
   getDateForOffset,
 } from '../lib/trainingPlan'
-import { logWeight, getRecentEntries, getWeightChange } from '../lib/weight'
 import WorkoutChart, { stepsToSegments, parseWorkoutSegments } from '../components/ui/WorkoutChart'
 import {
   Card,
   Badge,
-  StatDisplay,
   SectionHeader,
-  ProgressBar,
   MetricRing,
   NudgeBanner,
 } from '../components/ui'
@@ -73,27 +69,6 @@ export default function Dashboard() {
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
   const [todayExpanded, setTodayExpanded] = useState(false)
 
-  // Weight tracking state
-  const [inputWeight, setInputWeight] = useState('')
-  const [entries, setEntries] = useState([])
-  const [weightChange, setWeightChange] = useState(null)
-
-  useEffect(() => {
-    const recent = getRecentEntries(7)
-    setEntries(recent)
-    setWeightChange(getWeightChange(PLAN_START_DATE_DEFAULT))
-  }, [])
-
-  function handleLog() {
-    const val = parseFloat(inputWeight)
-    if (!val || isNaN(val)) return
-    logWeight(val)
-    const recent = getRecentEntries(7)
-    setEntries(recent)
-    setWeightChange(getWeightChange(PLAN_START_DATE_DEFAULT))
-    setInputWeight('')
-  }
-
   const nudge = (() => {
     if (!plan.todayDetails || nudgeDismissed || recovery.score == null) return null
     const { intensity } = plan.todayDetails
@@ -106,7 +81,7 @@ export default function Dashboard() {
     return null
   })()
 
-  const { todayDetails, weekNumber, weekWorkouts, weekPlannedMiles, daysToRace, isRestDay } = plan
+  const { todayDetails, weekNumber, daysToRace, isRestDay } = plan
 
   // Zone chart segments for today's planned workout
   const todaySegments = useMemo(() => {
@@ -237,11 +212,10 @@ export default function Dashboard() {
         </p>
       </Card>
 
-      {/* Today's workout — intervals.icu activity takes priority, then event, then JSON plan */}
+      {/* Today's workout */}
       {todayActivity ? (
         <Card variant="default">
           <SectionHeader title="Today" />
-          {/* Collapsed completed summary — tap to expand */}
           <button
             className="w-full text-left"
             onClick={() => setTodayExpanded(e => !e)}
@@ -271,7 +245,6 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* Expanded: planned workout + zone chart */}
           {todayExpanded && (
             <div className="mt-3 pt-3 border-t border-white/5">
               {todaySegments.length > 0 && (
@@ -393,98 +366,6 @@ export default function Dashboard() {
           )}
         </Card>
       )}
-
-      {/* Week strip */}
-      <Card variant="elevated" padding="sm">
-        <SectionHeader title="This Week" />
-        <div className="grid grid-cols-7 gap-1">
-          {weekWorkouts.map(({ offset, dayLabel, date, workout, isRest, isToday, isPast, isRaceDay: rd }) => {
-            const dateStr = date ? format(date, 'yyyy-MM-dd') : null
-            const act = dateStr ? activitiesByDate[dateStr] : null
-            const actMi = act?.distance ? (act.distance / 1609.34).toFixed(0) : null
-            return (
-            <div
-              key={offset}
-              className={[
-                'flex flex-col items-center gap-1 py-2 rounded-xl',
-                isToday ? 'bg-blue-500/10 ring-1 ring-blue-500/30' : '',
-              ].join(' ')}
-            >
-              <span className={`text-xs font-medium ${isToday ? 'text-blue-400' : 'text-gray-500'}`}>
-                {dayLabel}
-              </span>
-              <div className={[
-                'w-2 h-2 rounded-full',
-                rd      ? 'bg-yellow-400'  :
-                act     ? 'bg-green-500'   :
-                isRest  ? 'bg-white/10'    :
-                isPast  ? 'bg-white/20'    :
-                isToday ? 'bg-blue-400'    :
-                          'bg-white/20',
-              ].join(' ')} />
-              {!rd && (
-                <span className={`text-[9px] leading-none ${act ? 'text-green-500' : 'text-gray-600'}`}>
-                  {act && actMi ? `${actMi}mi` :
-                   !isRest && workout?.steps ? `${Math.round(workout.steps.reduce((s, st) => s + (parseInt(st.duration,10)||0), 0) / 60)}m` : ''}
-                </span>
-              )}
-            </div>
-          )})}
-        </div>
-        {weekPlannedMiles > 0 && (
-          <div className="mt-3 pt-3 border-t border-white/5">
-            <ProgressBar label="Planned miles this week" value={0} max={weekPlannedMiles} unit="mi" />
-          </div>
-        )}
-      </Card>
-
-      {/* Weight tracking */}
-      <Card variant="default">
-        <SectionHeader title="Weight" />
-        {/* Input row */}
-        <div className="flex gap-2 mb-3">
-          <input
-            type="number"
-            step="0.1"
-            value={inputWeight}
-            onChange={e => setInputWeight(e.target.value)}
-            placeholder="185"
-            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-blue-500/50"
-          />
-          <button
-            onClick={handleLog}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors"
-          >
-            Log
-          </button>
-        </div>
-        {/* Sparkline (only if entries exist) */}
-        {entries.length > 1 && (
-          <div className="-mx-1">
-            <ResponsiveContainer width="100%" height={52}>
-              <AreaChart data={entries} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <YAxis domain={['dataMin - 2', 'dataMax + 2']} hide />
-                <Area type="monotone" dataKey="weight" stroke="#3B82F6" strokeWidth={2} fill="url(#wGrad)" dot={false} isAnimationActive={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-        {/* Stat line */}
-        {weightChange && (
-          <p className="text-xs text-gray-400 mt-2">
-            {weightChange.change < 0 ? '↓' : '↑'} {Math.abs(weightChange.change).toFixed(1)} lbs since Jun 4
-          </p>
-        )}
-        {entries.length === 0 && (
-          <p className="text-sm text-gray-600 text-center py-2">Log your weight to start tracking</p>
-        )}
-      </Card>
 
     </div>
   )

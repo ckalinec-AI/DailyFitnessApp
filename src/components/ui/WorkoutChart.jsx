@@ -14,6 +14,9 @@ const ZONE_NAMES = {
   5: 'Z5 VO2',
 }
 
+// Block height as a fraction of chart height — higher zone = taller block
+const ZONE_H = { 1: 0.14, 2: 0.35, 3: 0.57, 4: 0.78, 5: 1.0 }
+
 // Convert JSON plan steps array to [{ minutes, zone }]
 export function stepsToSegments(steps) {
   if (!steps?.length) return []
@@ -77,30 +80,46 @@ export default function WorkoutChart({ segments = [], compact = false }) {
   const total = segments.reduce((s, seg) => s + seg.minutes, 0)
   if (total === 0) return null
 
+  const chartH = compact ? 36 : 76
   const zoneSet = [...new Set(segments.map(s => s.zone))].sort()
 
   return (
     <div className="w-full">
+      {/* Zone profile chart — blocks sit at the bottom, height = zone level */}
       <div
-        className="w-full rounded-full overflow-hidden flex"
-        style={{ height: compact ? 6 : 10 }}
+        className="w-full rounded-xl overflow-hidden"
+        style={{ height: chartH, backgroundColor: 'rgba(0,0,0,0.4)' }}
       >
-        {segments.map((seg, i) => (
-          <div
-            key={i}
-            style={{
-              flex: seg.minutes,
-              backgroundColor: ZONE_COLORS[seg.zone] ?? ZONE_COLORS[1],
-            }}
-          />
-        ))}
+        <div
+          className="h-full flex items-end"
+          style={{ gap: 1.5, padding: '0 1.5px' }}
+        >
+          {segments.map((seg, i) => {
+            const hPct = (ZONE_H[seg.zone] ?? ZONE_H[1]) * 100
+            const color = ZONE_COLORS[seg.zone] ?? ZONE_COLORS[1]
+            return (
+              <div
+                key={i}
+                style={{
+                  flex: seg.minutes,
+                  height: `${hPct}%`,
+                  minWidth: 2,
+                  background: `linear-gradient(to bottom, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 55%), ${color}`,
+                  borderRadius: '3px 3px 0 0',
+                }}
+              />
+            )
+          })}
+        </div>
       </div>
-      {!compact && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+
+      {/* Zone legend */}
+      {!compact && zoneSet.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
           {zoneSet.map(z => (
             <span key={z} className="flex items-center gap-1 text-[10px] text-gray-500">
               <span
-                className="inline-block w-1.5 h-1.5 rounded-sm shrink-0"
+                className="inline-block w-2 h-2 rounded-sm shrink-0"
                 style={{ backgroundColor: ZONE_COLORS[z] }}
               />
               {ZONE_NAMES[z]}

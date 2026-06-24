@@ -106,3 +106,8 @@ export async function fetchRecoveryHistory(accessToken, days = 30) {
   const data = await whoopFetch(`/v2/recovery?limit=${days}&start=${start}`, accessToken)
   return data.records ?? []
 }
+
+// GET /v2/body_measurement — height, weight, max HR
+export async function fetchBodyMeasurement(accessToken) {
+  return whoopFetch('/v2/body_measurement', accessToken)
+}

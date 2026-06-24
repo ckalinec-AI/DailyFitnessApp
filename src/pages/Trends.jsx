@@ -15,6 +15,7 @@ import SectionHeader from '../components/ui/SectionHeader'
 import EmptyState from '../components/ui/EmptyState'
 import { getWorkoutForOffset, getDayOffset, getDateForOffset, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
 import { useIntervals } from '../hooks/useIntervals'
+import { useWhoop } from '../hooks/useWhoop'
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -37,13 +38,15 @@ function MoonIcon() {
 // ── Section 1: Weight Trend ────────────────────────────────────────────────
 
 function WeightSection() {
+  const { connected: whoopConnected, bodyData } = useWhoop()
+
   const weightLog = useMemo(() => {
     try {
       return JSON.parse(localStorage.getItem('kadence_weight_log') || '[]')
     } catch {
       return []
     }
-  }, [])
+  }, [bodyData]) // re-read after each Whoop sync that may have written a new entry
 
   const hasData = weightLog.length > 0
   const first = hasData ? weightLog[0] : null
@@ -55,6 +58,31 @@ function WeightSection() {
   return (
     <Card variant="default">
       <SectionHeader title="Weight" />
+
+      {/* Whoop sync badge */}
+      <div className="flex items-center gap-1.5 mb-3 text-xs">
+        {whoopConnected ? (
+          bodyData?.weightLbs ? (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+              <span className="text-gray-400">
+                Syncing from Whoop · {bodyData.weightLbs} lbs
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 shrink-0" />
+              <span className="text-gray-500">Whoop connected — waiting for body data</span>
+            </>
+          )
+        ) : (
+          <>
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-600 shrink-0" />
+            <span className="text-gray-600">Connect Whoop to auto-sync weight from Apple Health</span>
+          </>
+        )}
+      </div>
+
       {hasData ? (
         <>
           <ResponsiveContainer width="100%" height={160}>
@@ -109,8 +137,8 @@ function WeightSection() {
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
           }
-          title="No weight data"
-          description="Log your weight on the Today screen to see your trend here"
+          title="No weight data yet"
+          description={whoopConnected ? 'Weight will appear here once Whoop syncs body measurements' : 'Connect Whoop to sync weight automatically from Apple Health'}
         />
       )}
     </Card>
