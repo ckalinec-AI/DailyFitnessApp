@@ -1,11 +1,19 @@
-import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
+import { useState, useEffect, useMemo } from 'react'
+import { format, differenceInCalendarDays } from 'date-fns'
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts'
 import { usePlan } from '../hooks/usePlan'
 import { useWhoop } from '../hooks/useWhoop'
 import { useIntervals } from '../hooks/useIntervals'
-import { HR_ZONES, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
+import {
+  HR_ZONES,
+  PLAN_START_DATE_DEFAULT,
+  PLAN_END_OFFSET,
+  getDayOffset,
+  getWorkoutForOffset,
+  getDateForOffset,
+} from '../lib/trainingPlan'
 import { logWeight, getRecentEntries, getWeightChange } from '../lib/weight'
+import WorkoutChart, { stepsToSegments, parseWorkoutSegments } from '../components/ui/WorkoutChart'
 import {
   Card,
   Badge,
@@ -26,10 +34,30 @@ const intensityLabel = {
   threshold:  { text: 'Threshold',  variant: 'accent' },
 }
 
+function ChevronIcon({ expanded }) {
+  return (
+    <svg
+      className={`w-4 h-4 text-gray-500 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2.5}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+  )
+}
+
+function formatDuration(secs) {
+  const h = Math.floor(secs / 3600)
+  const m = Math.round((secs % 3600) / 60)
+  return h > 0 ? `${h}h ${m}m` : `${m} min`
+}
+
 export default function Dashboard() {
   const plan = usePlan()
   const whoop = useWhoop()
-  const { eventsByDate, activitiesByDate } = useIntervals()
+  const { events, eventsByDate, activitiesByDate } = useIntervals()
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const todayEvent = eventsByDate[todayStr] ?? null
@@ -43,6 +71,7 @@ export default function Dashboard() {
     synced:   whoop.lastSyncedMins         ?? null,
   }
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
+  const [todayExpanded, setTodayExpanded] = useState(false)
 
   // Weight tracking state
   const [inputWeight, setInputWeight] = useState('')
@@ -78,6 +107,62 @@ export default function Dashboard() {
   })()
 
   const { todayDetails, weekNumber, weekWorkouts, weekPlannedMiles, daysToRace, isRestDay } = plan
+
+  // Zone chart segments for today's planned workout
+  const todaySegments = useMemo(() => {
+    if (todayEvent?.description) {
+      const parsed = parseWorkoutSegments(todayEvent.description)
+      if (parsed.length) return parsed
+    }
+    if (todayDetails?.workout?.steps) return stepsToSegments(todayDetails.workout.steps)
+    return []
+  }, [todayEvent, todayDetails])
+
+  // Next upcoming workout (intervals.icu first, then JSON plan fallback)
+  const nextWorkoutData = useMemo(() => {
+    const upcoming = events
+      .filter(e => e.start_date_local && e.start_date_local.slice(0, 10) > todayStr)
+      .sort((a, b) => a.start_date_local.localeCompare(b.start_date_local))
+
+    let result = null
+
+    if (upcoming.length > 0) {
+      const evt = upcoming[0]
+      const dateStr = evt.start_date_local.slice(0, 10)
+      const offset = getDayOffset(PLAN_START_DATE_DEFAULT, new Date(dateStr + 'T12:00:00'))
+      const jsonW = getWorkoutForOffset(offset)
+      const segs = jsonW ? stepsToSegments(jsonW.steps) : parseWorkoutSegments(evt.description)
+      result = { name: evt.name, dateStr, movingTime: evt.moving_time, segments: segs }
+    } else {
+      const todayOff = getDayOffset(PLAN_START_DATE_DEFAULT)
+      for (let off = todayOff + 1; off <= PLAN_END_OFFSET; off++) {
+        const w = getWorkoutForOffset(off)
+        if (w) {
+          const date = getDateForOffset(PLAN_START_DATE_DEFAULT, off)
+          result = {
+            name: w.name,
+            dateStr: format(date, 'yyyy-MM-dd'),
+            movingTime: null,
+            segments: stepsToSegments(w.steps),
+          }
+          break
+        }
+      }
+    }
+
+    if (!result) return null
+
+    const diff = differenceInCalendarDays(
+      new Date(result.dateStr + 'T12:00:00'),
+      new Date(todayStr + 'T12:00:00')
+    )
+    result.dateLabel =
+      diff === 1 ? 'Tomorrow'
+      : diff < 7 ? format(new Date(result.dateStr + 'T12:00:00'), 'EEEE')
+      : format(new Date(result.dateStr + 'T12:00:00'), 'MMM d')
+
+    return result
+  }, [events, todayStr])
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
@@ -152,38 +237,86 @@ export default function Dashboard() {
         </p>
       </Card>
 
-      {/* Today's workout — intervals.icu takes priority over JSON plan */}
+      {/* Today's workout — intervals.icu activity takes priority, then event, then JSON plan */}
       {todayActivity ? (
         <Card variant="default">
           <SectionHeader title="Today" />
-          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-            <p className="text-xs text-green-400 font-semibold uppercase tracking-wide mb-1">Completed</p>
-            <p className="text-base font-bold text-green-300">{todayActivity.name}</p>
-            <div className="flex gap-4 mt-1.5 text-sm text-green-400/80">
-              {todayActivity.distance && <span>{(todayActivity.distance / 1609.34).toFixed(1)} mi</span>}
-              {todayActivity.moving_time && <span>{Math.round(todayActivity.moving_time / 60)} min</span>}
-              {todayActivity.icu_training_load && <span>{Math.round(todayActivity.icu_training_load)} TSS</span>}
+          {/* Collapsed completed summary — tap to expand */}
+          <button
+            className="w-full text-left"
+            onClick={() => setTodayExpanded(e => !e)}
+          >
+            <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-green-400 font-semibold uppercase tracking-wide mb-0.5">Completed</p>
+                  <p className="text-base font-bold text-green-300 leading-tight">{todayActivity.name}</p>
+                </div>
+                <ChevronIcon expanded={todayExpanded} />
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-green-400/80">
+                {todayActivity.distance > 0 && (
+                  <span>{(todayActivity.distance / 1609.34).toFixed(1)} mi</span>
+                )}
+                {todayActivity.moving_time > 0 && (
+                  <span>{formatDuration(todayActivity.moving_time)}</span>
+                )}
+                {todayActivity.icu_training_load > 0 && (
+                  <span>{Math.round(todayActivity.icu_training_load)} TSS</span>
+                )}
+                {todayActivity.average_heartrate > 0 && (
+                  <span>{Math.round(todayActivity.average_heartrate)} bpm</span>
+                )}
+              </div>
             </div>
-          </div>
-          {todayEvent && (
-            <p className="text-xs text-gray-600 mt-2">Planned: {todayEvent.name}</p>
+          </button>
+
+          {/* Expanded: planned workout + zone chart */}
+          {todayExpanded && (
+            <div className="mt-3 pt-3 border-t border-white/5">
+              {todaySegments.length > 0 && (
+                <div className="mb-3">
+                  <WorkoutChart segments={todaySegments} />
+                </div>
+              )}
+              {(todayEvent || todayDetails) && (
+                <>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Planned</p>
+                  <p className="text-sm font-bold text-white mb-1">
+                    {todayEvent?.name ?? todayDetails?.workout?.name}
+                  </p>
+                  {(todayEvent?.description || todayDetails?.workout?.description) && (
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      {todayEvent?.description ?? todayDetails?.workout?.description}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </Card>
+
       ) : todayEvent ? (
         <Card variant="default">
           <SectionHeader title="Today's Workout" />
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-bold text-white leading-tight">{todayEvent.name}</h3>
-              {todayEvent.moving_time && (
-                <span className="text-sm text-gray-400">{Math.round(todayEvent.moving_time / 60)} min</span>
-              )}
-              {todayEvent.description && (
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed line-clamp-3">{todayEvent.description}</p>
+              {todayEvent.moving_time > 0 && (
+                <p className="text-sm text-gray-400 mt-0.5">{formatDuration(todayEvent.moving_time)}</p>
               )}
             </div>
           </div>
+          {todaySegments.length > 0 && (
+            <div className="mb-3">
+              <WorkoutChart segments={todaySegments} />
+            </div>
+          )}
+          {todayEvent.description && (
+            <p className="text-xs text-gray-500 leading-relaxed">{todayEvent.description}</p>
+          )}
         </Card>
+
       ) : isRestDay ? (
         <Card variant="default">
           <SectionHeader title="Today" />
@@ -195,13 +328,14 @@ export default function Dashboard() {
             </div>
           </div>
         </Card>
+
       ) : todayDetails ? (
         <Card variant="default">
           <SectionHeader title="Today's Workout" />
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-bold text-white leading-tight">{todayDetails.workout.name}</h3>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-sm text-gray-400">{todayDetails.duration} min</span>
                 {todayDetails.primaryZone && (
                   <>
@@ -212,9 +346,6 @@ export default function Dashboard() {
                   </>
                 )}
               </div>
-              {todayDetails.structure && (
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">{todayDetails.structure}</p>
-              )}
             </div>
             {intensityLabel[todayDetails.intensity] && (
               <Badge variant={intensityLabel[todayDetails.intensity].variant} size="sm" className="shrink-0">
@@ -222,19 +353,44 @@ export default function Dashboard() {
               </Badge>
             )}
           </div>
-          {todayDetails.workout.description && (
-            <div className="mt-3 pt-3 border-t border-white/5">
-              <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
-                {todayDetails.workout.description}
-              </p>
+          {todaySegments.length > 0 && (
+            <div className="mb-3">
+              <WorkoutChart segments={todaySegments} />
             </div>
           )}
+          {todayDetails.workout.description && (
+            <p className="text-xs text-gray-500 leading-relaxed">
+              {todayDetails.workout.description}
+            </p>
+          )}
         </Card>
+
       ) : (
         <Card variant="default">
           <p className="text-sm text-gray-500 text-center py-4">
             {plan.dayOffset < 0 ? 'Plan starts June 4, 2026' : 'Plan complete — great work.'}
           </p>
+        </Card>
+      )}
+
+      {/* Next Workout tile */}
+      {nextWorkoutData && (
+        <Card variant="elevated">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Next Up</span>
+                <span className="text-[10px] text-gray-600">{nextWorkoutData.dateLabel}</span>
+              </div>
+              <p className="text-sm font-bold text-white leading-tight truncate">{nextWorkoutData.name}</p>
+              {nextWorkoutData.movingTime > 0 && (
+                <p className="text-xs text-gray-500 mt-0.5">{formatDuration(nextWorkoutData.movingTime)}</p>
+              )}
+            </div>
+          </div>
+          {nextWorkoutData.segments.length > 0 && (
+            <WorkoutChart segments={nextWorkoutData.segments} compact />
+          )}
         </Card>
       )}
 

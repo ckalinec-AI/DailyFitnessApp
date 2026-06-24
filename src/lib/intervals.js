@@ -22,6 +22,6 @@ export async function fetchEvents(oldest, newest) {
 // Completed activities in a date range
 export async function fetchActivities(oldest, newest) {
   return intervalsFetch(
-    `/activities?oldest=${oldest}&newest=${newest}&fields=id,name,start_date_local,type,distance,moving_time,icu_training_load`
+    `/activities?oldest=${oldest}&newest=${newest}&fields=id,name,start_date_local,type,distance,moving_time,icu_training_load,average_heartrate,max_heartrate`
   )
 }
