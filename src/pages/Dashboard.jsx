@@ -252,68 +252,52 @@ export default function Dashboard() {
 
       {/* Weather card */}
       <Card variant="default">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Weather</p>
-            {weatherLoading && !weather ? (
-              <p className="text-sm text-gray-500">Fetching weather…</p>
-            ) : weatherError && !weather ? (
-              <p className="text-sm text-yellow-600/80">{weatherError}</p>
-            ) : weather ? (
-              <>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-3xl leading-none">{weather.icon}</span>
-                  <div>
-                    <p className="text-2xl font-black text-white leading-none">{weather.tempF}°F</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{weather.condition}</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-400">
-                  <span>💨 {weather.windMph} mph</span>
-                  {!weather.noRain && (
-                    <span>🌧 {weather.precipPct}% rain chance</span>
-                  )}
-                </div>
-              </>
-            ) : null}
-          </div>
-          {weather && (
-            <div className="text-right space-y-2 shrink-0">
-              <div className={[
-                'rounded-lg px-2.5 py-1 text-xs font-semibold',
-                weather.sunglasses === 'tinted'
-                  ? 'bg-yellow-500/15 text-yellow-300'
-                  : 'bg-white/5 text-gray-400',
-              ].join(' ')}>
-                🕶 {weather.sunglasses === 'tinted' ? 'Tinted lenses' : 'Clear lenses'}
-              </div>
-              <div className={[
-                'rounded-lg px-2.5 py-1 text-xs font-semibold',
-                weather.jacket
-                  ? 'bg-blue-500/15 text-blue-300'
-                  : 'bg-white/5 text-gray-400',
-              ].join(' ')}>
-                🧥 {weather.jacket ? 'Pack a jacket' : 'No jacket needed'}
-              </div>
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Weather</p>
+        {weatherLoading && !weather ? (
+          <p className="text-sm text-gray-500">Fetching weather…</p>
+        ) : weatherError && !weather ? (
+          <p className="text-sm text-yellow-600/80">{weatherError}</p>
+        ) : weather ? (
+          <div className="flex items-center gap-3">
+            {/* Condition */}
+            <span className="text-3xl leading-none shrink-0">{weather.icon}</span>
+            <div className="shrink-0">
+              <p className="text-2xl font-black text-white leading-none">{weather.tempF}°F</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{weather.condition}</p>
             </div>
-          )}
-        </div>
-        {weather && (
-          <div className="mt-2 border-t border-white/5 pt-2 flex items-center justify-between">
-            <p className="text-[10px] text-gray-700">
-              {weather.rainRisk === 'high' ? '⚠️ High rain risk — pack a jacket'
-               : weather.rainRisk === 'moderate' ? 'Moderate rain chance'
-               : weather.noRain ? 'No rain expected'
-               : 'Ride conditions look good'}
-            </p>
+
+            <div className="h-8 w-px bg-white/8 mx-1 shrink-0" />
+
+            {/* Stats */}
+            <div className="flex items-center gap-4 flex-1 flex-wrap">
+              <div className="text-center">
+                <p className="text-sm font-bold text-white">{weather.cloudPct}%</p>
+                <p className="text-[10px] text-gray-500">Cloud</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-white">{weather.windMph} <span className="text-xs font-normal">mph</span></p>
+                <p className="text-[10px] text-gray-500">{weather.windDir} Wind</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-white">{weather.precipPct}%</p>
+                <p className="text-[10px] text-gray-500">Rain chance</p>
+              </div>
+              {weather.precipIn > 0 && (
+                <div className="text-center">
+                  <p className="text-sm font-bold text-white">{weather.precipIn}"</p>
+                  <p className="text-[10px] text-gray-500">Expected</p>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => refreshWeather({ forceRefresh: true })}
-              className="text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
+              className="text-[10px] text-gray-700 hover:text-gray-400 transition-colors shrink-0"
             >
-              {weatherLoading ? 'Refreshing…' : 'Refresh'}
+              {weatherLoading ? '…' : '↻'}
             </button>
           </div>
-        )}
+        ) : null}
       </Card>
 
       {/* Today's workout */}
