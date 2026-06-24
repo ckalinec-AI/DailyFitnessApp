@@ -10,7 +10,7 @@
     @apply bg-gray-900 text-gray-50 font-inter;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    height: 100%;
+    height: 100dvh;
     overflow: hidden;
   }
 
@@ -41,7 +41,7 @@
   }
 
   #root {
-    height: 100%;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     padding-top: env(safe-area-inset-top);

@@ -8,7 +8,7 @@ import WhoopCallback from './pages/WhoopCallback'
 
 function App() {
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-gray-50 font-inter">
+    <div className="flex flex-col bg-gray-900 text-gray-50 font-inter" style={{ height: '100dvh' }}>
       <main className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'none' }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
