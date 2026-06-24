@@ -9,7 +9,13 @@ import WhoopCallback from './pages/WhoopCallback'
 function App() {
   return (
     <div className="flex flex-col bg-gray-900 text-gray-50 font-inter" style={{ height: '100dvh' }}>
-      <main className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'none' }}>
+      <main
+        className="flex-1 overflow-y-auto min-h-0"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          overscrollBehavior: 'none',
+        }}
+      >
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/plan" element={<TrainingPlan />} />
