@@ -78,21 +78,21 @@ async function whoopFetch(path, accessToken) {
   return res.json()
 }
 
-// GET /v1/recovery — returns latest record or null
+// GET /v2/recovery — returns latest record or null
 export async function fetchRecovery(accessToken) {
-  const data = await whoopFetch('/v1/recovery?limit=1', accessToken)
+  const data = await whoopFetch('/v2/recovery?limit=1', accessToken)
   return data.records?.[0] ?? null
 }
 
-// GET /v1/activity/sleep — returns latest record or null
+// GET /v2/activity/sleep — returns latest record or null
 export async function fetchSleep(accessToken) {
-  const data = await whoopFetch('/v1/activity/sleep?limit=1', accessToken)
+  const data = await whoopFetch('/v2/activity/sleep?limit=1', accessToken)
   return data.records?.[0] ?? null
 }
 
-// GET /v1/recovery for last N days (for HRV trend)
+// GET /v2/recovery for last N days (for HRV trend)
 export async function fetchRecoveryHistory(accessToken, days = 30) {
   const start = new Date(Date.now() - days * 86400000).toISOString()
-  const data = await whoopFetch(`/v1/recovery?limit=${days}&start=${start}`, accessToken)
+  const data = await whoopFetch(`/v2/recovery?limit=${days}&start=${start}`, accessToken)
   return data.records ?? []
 }
