@@ -11,6 +11,7 @@ export default function WhoopCallback() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
+    const state = params.get('state')
     const error = params.get('error')
 
     if (error) {
@@ -18,6 +19,14 @@ export default function WhoopCallback() {
       setErrorMsg(error === 'access_denied' ? 'Access denied. Please try again.' : `OAuth error: ${error}`)
       return
     }
+
+    const expectedState = sessionStorage.getItem('whoop_oauth_state')
+    if (!state || state !== expectedState) {
+      setStatus('error')
+      setErrorMsg('State mismatch — please try connecting again.')
+      return
+    }
+    sessionStorage.removeItem('whoop_oauth_state')
 
     if (!code) {
       setStatus('error')

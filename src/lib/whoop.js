@@ -17,7 +17,11 @@ export async function generateCodeChallenge(verifier) {
 export async function buildAuthUrl() {
   const verifier = await generateCodeVerifier()
   const challenge = await generateCodeChallenge(verifier)
+  const state = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+
   sessionStorage.setItem('whoop_code_verifier', verifier)
+  sessionStorage.setItem('whoop_oauth_state', state)
 
   const clientId = import.meta.env.VITE_WHOOP_CLIENT_ID || ''
   const redirectUri = import.meta.env.VITE_WHOOP_REDIRECT_URI || `${window.location.origin}/whoop/callback`
@@ -30,6 +34,7 @@ export async function buildAuthUrl() {
     response_type: 'code',
     code_challenge: challenge,
     code_challenge_method: 'S256',
+    state,
   })
 
   return `https://api.prod.whoop.com/oauth/oauth2/auth?${params.toString()}`
