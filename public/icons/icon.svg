@@ -1,15 +1,34 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="96" fill="#111827"/>
-  <circle cx="256" cy="256" r="180" fill="none" stroke="#3B82F6" stroke-width="20"/>
-  <circle cx="256" cy="256" r="28" fill="#3B82F6"/>
-  <circle cx="256" cy="256" r="16" fill="#111827"/>
-  <line x1="256" y1="76" x2="256" y2="228" stroke="#3B82F6" stroke-width="8" stroke-linecap="round"/>
-  <line x1="383" y1="129" x2="274" y2="238" stroke="#3B82F6" stroke-width="8" stroke-linecap="round"/>
-  <line x1="436" y1="256" x2="284" y2="256" stroke="#3B82F6" stroke-width="8" stroke-linecap="round"/>
-  <line x1="383" y1="383" x2="274" y2="274" stroke="#3B82F6" stroke-width="8" stroke-linecap="round"/>
-  <line x1="256" y1="436" x2="256" y2="284" stroke="#3B82F6" stroke-width="8" stroke-linecap="round"/>
-  <line x1="129" y1="383" x2="238" y2="274" stroke="#3B82F6" stroke-width="8" stroke-linecap="round"/>
-  <line x1="76" y1="256" x2="228" y2="256" stroke="#3B82F6" stroke-width="8" stroke-linecap="round"/>
-  <line x1="129" y1="129" x2="238" y2="238" stroke="#3B82F6" stroke-width="8" stroke-linecap="round"/>
-  <path d="M 256 76 A 180 180 0 0 1 436 256" fill="none" stroke="#60A5FA" stroke-width="24" stroke-linecap="round" opacity="0.7"/>
+  <defs>
+    <!-- Dark navy → dark blue diagonal background -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#0B1120"/>
+      <stop offset="100%" stop-color="#0F2557"/>
+    </linearGradient>
+
+    <!-- Blue gradient for K arms: lighter at top, deeper at bottom -->
+    <linearGradient id="armGrad" x1="0" y1="96" x2="0" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#93C5FD"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bgGrad)"/>
+
+  <!-- Subtle cadence ring behind the K -->
+  <circle cx="268" cy="256" r="198" fill="none" stroke="#3B82F6" stroke-width="2" opacity="0.14"/>
+
+  <!-- K · vertical stem (white, slightly rounded) -->
+  <rect x="108" y="96" width="86" height="320" rx="6" fill="white"/>
+
+  <!-- K · upper diagonal arm (blue gradient)
+       corners: stem-junction-top (194,220), arm-tip-top (400,96),
+                arm-tip-bottom (400,167), notch (194,256) -->
+  <polygon points="194,220 400,96 400,167 194,256" fill="url(#armGrad)"/>
+
+  <!-- K · lower diagonal arm (blue gradient, mirror of upper)
+       corners: notch (194,256), arm-tip-top (400,345),
+                arm-tip-bottom (400,416), stem-junction-bottom (194,292) -->
+  <polygon points="194,256 400,345 400,416 194,292" fill="url(#armGrad)"/>
 </svg>
