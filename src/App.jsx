@@ -8,8 +8,8 @@ import WhoopCallback from './pages/WhoopCallback'
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-50 font-inter">
-      <main className="pb-20">
+    <div className="flex flex-col h-full bg-gray-900 text-gray-50 font-inter">
+      <main className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'none' }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/plan" element={<TrainingPlan />} />

@@ -44,10 +44,10 @@ const navItems = [
 export default function BottomNav() {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900 border-t border-gray-800"
-      style={{ height: '64px', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="shrink-0 bg-gray-900 border-t border-gray-800"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="flex items-center justify-around h-full px-2">
+      <div className="flex items-center justify-around h-16 px-2">
         {navItems.map(({ to, label, icon }) => (
           <NavLink
             key={to}

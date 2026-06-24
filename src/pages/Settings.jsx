@@ -50,7 +50,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="px-4 pt-6 pb-8 space-y-6">
+    <div className="px-4 pt-3 pb-6 space-y-6">
       <h1 className="text-2xl font-black text-white tracking-tight">Settings</h1>
 
       {/* Training Plan section */}

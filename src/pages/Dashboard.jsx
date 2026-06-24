@@ -84,7 +84,8 @@ export default function Dashboard() {
   }, [whoop, refreshWeather])
 
   function onTouchStart(e) {
-    if (window.scrollY === 0) touchStartY.current = e.touches[0].clientY
+    const mainEl = document.querySelector('main')
+    if ((mainEl?.scrollTop ?? 0) === 0) touchStartY.current = e.touches[0].clientY
   }
   function onTouchMove(e) {
     if (touchStartY.current === null) return
@@ -169,7 +170,7 @@ export default function Dashboard() {
 
   return (
     <div
-      className="px-4 pt-6 pb-8 space-y-4"
+      className="px-4 pt-3 pb-6 space-y-4"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}

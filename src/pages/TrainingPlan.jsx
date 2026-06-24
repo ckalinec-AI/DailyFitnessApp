@@ -347,9 +347,9 @@ export default function TrainingPlan() {
   }, [startDate, todayOffset, eventsByDate, activitiesByDate])
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="bg-gray-900">
       {/* Sticky header */}
-      <div className="px-4 pt-6 pb-4 sticky top-0 bg-gray-900 z-10 border-b border-gray-800/60">
+      <div className="px-4 pt-3 pb-4 sticky top-0 bg-gray-900 z-10 border-b border-gray-800/60">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-50">Training Plan</h1>
           <div className="flex items-center gap-2">
