@@ -9,7 +9,6 @@
     @apply bg-gray-900;
     height: 100%;
     height: -webkit-fill-available;
-    overflow: hidden;
     overscroll-behavior: none;
   }
 
@@ -19,7 +18,6 @@
     -moz-osx-font-smoothing: grayscale;
     height: 100%;
     min-height: -webkit-fill-available;
-    overflow: hidden;
     overscroll-behavior: none;
   }
 
@@ -51,6 +49,7 @@
 
   #root {
     height: 100%;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
   }
