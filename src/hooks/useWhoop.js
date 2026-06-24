@@ -70,14 +70,28 @@ export function useWhoop() {
       const token = await getValidToken()
       if (!token) { setLoading(false); return }
 
-      const [rec, sleep, cycle] = await Promise.all([
-        fetchRecovery(token).catch(() => null),
-        fetchSleep(token).catch(() => null),
-        fetchCycle(token).catch(() => null),
+      const [recResult, sleepResult, cycleResult] = await Promise.allSettled([
+        fetchRecovery(token),
+        fetchSleep(token),
+        fetchCycle(token),
       ])
 
+      const rec   = recResult.status   === 'fulfilled' ? recResult.value   : null
+      const sleep = sleepResult.status === 'fulfilled' ? sleepResult.value : null
+      const cycle = cycleResult.status === 'fulfilled' ? cycleResult.value : null
+
       if (!rec && !sleep && !cycle) {
-        setError('Could not fetch Whoop data — check your connection.')
+        const firstErr = [recResult, sleepResult, cycleResult]
+          .find(r => r.status === 'rejected')?.reason
+        const status = firstErr?.status
+        if (status === 401) {
+          setError('Session expired — reconnect Whoop.')
+          disconnect()
+        } else if (status === 403) {
+          setError('Permission denied (403) — reconnect Whoop to re-grant access.')
+        } else {
+          setError(firstErr?.message || 'Could not reach Whoop API.')
+        }
       }
 
       if (rec) {

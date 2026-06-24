@@ -74,7 +74,11 @@ async function whoopFetch(path, accessToken) {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
-  if (!res.ok) throw Object.assign(new Error('Whoop API error'), { status: res.status })
+  if (!res.ok) {
+    let detail = res.status
+    try { const j = await res.json(); detail = j.message || j.error || res.status } catch {}
+    throw Object.assign(new Error(`Whoop ${res.status}: ${detail}`), { status: res.status })
+  }
   return res.json()
 }
 
