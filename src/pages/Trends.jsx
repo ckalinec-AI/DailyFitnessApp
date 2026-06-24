@@ -13,7 +13,8 @@ import {
 import Card from '../components/ui/Card'
 import SectionHeader from '../components/ui/SectionHeader'
 import EmptyState from '../components/ui/EmptyState'
-import { getWorkoutForOffset, getDayOffset, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
+import { getWorkoutForOffset, getDayOffset, getDateForOffset, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
+import { useIntervals } from '../hooks/useIntervals'
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -147,24 +148,38 @@ function HRVSection() {
 // ── Section 3: Weekly Mileage ─────────────────────────────────────────────
 
 function MileageSection() {
+  const { activities } = useIntervals()
+
   const weekData = useMemo(() => {
     const currentOffset = getDayOffset(PLAN_START_DATE_DEFAULT)
     const currentWeek = Math.max(0, Math.floor(currentOffset / 7))
-    const data = []
 
+    // Build actual miles per week from intervals.icu activities
+    const actByWeek = {}
+    activities.forEach(a => {
+      if (!a.start_date_local || !a.distance) return
+      const dateStr = a.start_date_local.slice(0, 10)
+      const offset = getDayOffset(PLAN_START_DATE_DEFAULT, new Date(dateStr + 'T12:00:00'))
+      if (offset < 0) return
+      const w = Math.floor(offset / 7)
+      actByWeek[w] = (actByWeek[w] || 0) + a.distance / 1609.34
+    })
+
+    const data = []
     for (let w = Math.max(0, currentWeek - 5); w <= currentWeek; w++) {
-      const weekStartOffset = w * 7
       let planned = 0
       for (let d = 0; d < 7; d++) {
-        const workout = getWorkoutForOffset(weekStartOffset + d)
+        const workout = getWorkoutForOffset(w * 7 + d)
         const match = workout?.name?.match(/~(\d+)\s*mi/)
         if (match) planned += parseInt(match[1], 10)
       }
-      data.push({ week: `W${w + 1}`, planned, actual: 0 })
+      const actual = actByWeek[w] ? parseFloat(actByWeek[w].toFixed(1)) : 0
+      data.push({ week: `W${w + 1}`, planned, actual })
     }
-
     return data
-  }, [])
+  }, [activities])
+
+  const hasActual = weekData.some(w => w.actual > 0)
 
   return (
     <Card variant="default">
@@ -176,20 +191,26 @@ function MileageSection() {
           <Tooltip
             contentStyle={{ background: '#1F2937', border: '1px solid #374151', borderRadius: 8 }}
             itemStyle={{ color: '#fff' }}
+            formatter={(v, name) => [`${v} mi`, name]}
           />
-          <Bar dataKey="planned" fill="#1D4ED8" opacity={0.5} radius={[3, 3, 0, 0]} name="Planned mi" />
-          <Bar dataKey="actual" fill="#3B82F6" radius={[3, 3, 0, 0]} name="Actual mi" />
+          <Bar dataKey="planned" fill="#1D4ED8" opacity={0.5} radius={[3, 3, 0, 0]} name="Planned" />
+          <Bar dataKey="actual"  fill="#3B82F6" radius={[3, 3, 0, 0]} name="Actual" />
         </BarChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex items-center gap-4 text-xs text-gray-400">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-800 opacity-50" />
-          Planned mi
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
-          Actual mi
-        </span>
+      <div className="mt-2 flex items-center justify-between">
+        <div className="flex items-center gap-4 text-xs text-gray-400">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-800 opacity-50" />
+            Planned
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
+            Actual
+          </span>
+        </div>
+        {!hasActual && (
+          <span className="text-xs text-gray-600">Syncing from Intervals.icu…</span>
+        )}
       </div>
     </Card>
   )

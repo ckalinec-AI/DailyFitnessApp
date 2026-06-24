@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts'
 import { usePlan } from '../hooks/usePlan'
 import { useWhoop } from '../hooks/useWhoop'
+import { useIntervals } from '../hooks/useIntervals'
 import { HR_ZONES, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
 import { logWeight, getRecentEntries, getWeightChange } from '../lib/weight'
 import {
@@ -27,8 +28,12 @@ const intensityLabel = {
 
 export default function Dashboard() {
   const plan = usePlan()
-
   const whoop = useWhoop()
+  const { eventsByDate, activitiesByDate } = useIntervals()
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const todayEvent = eventsByDate[todayStr] ?? null
+  const todayActivity = activitiesByDate[todayStr] ?? null
   const recovery = {
     score:    whoop.recoveryData?.score    ?? null,
     hrv:      whoop.recoveryData?.hrv      ?? null,
@@ -147,15 +152,46 @@ export default function Dashboard() {
         </p>
       </Card>
 
-      {/* Today's workout */}
-      {isRestDay ? (
+      {/* Today's workout — intervals.icu takes priority over JSON plan */}
+      {todayActivity ? (
+        <Card variant="default">
+          <SectionHeader title="Today" />
+          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+            <p className="text-xs text-green-400 font-semibold uppercase tracking-wide mb-1">Completed</p>
+            <p className="text-base font-bold text-green-300">{todayActivity.name}</p>
+            <div className="flex gap-4 mt-1.5 text-sm text-green-400/80">
+              {todayActivity.distance && <span>{(todayActivity.distance / 1609.34).toFixed(1)} mi</span>}
+              {todayActivity.moving_time && <span>{Math.round(todayActivity.moving_time / 60)} min</span>}
+              {todayActivity.icu_training_load && <span>{Math.round(todayActivity.icu_training_load)} TSS</span>}
+            </div>
+          </div>
+          {todayEvent && (
+            <p className="text-xs text-gray-600 mt-2">Planned: {todayEvent.name}</p>
+          )}
+        </Card>
+      ) : todayEvent ? (
+        <Card variant="default">
+          <SectionHeader title="Today's Workout" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-bold text-white leading-tight">{todayEvent.name}</h3>
+              {todayEvent.moving_time && (
+                <span className="text-sm text-gray-400">{Math.round(todayEvent.moving_time / 60)} min</span>
+              )}
+              {todayEvent.description && (
+                <p className="text-xs text-gray-500 mt-2 leading-relaxed line-clamp-3">{todayEvent.description}</p>
+              )}
+            </div>
+          </div>
+        </Card>
+      ) : isRestDay ? (
         <Card variant="default">
           <SectionHeader title="Today" />
           <div className="flex items-center gap-3 py-1">
             <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-xl">😴</div>
             <div>
               <p className="text-base font-semibold text-white">Rest Day</p>
-              <p className="text-sm text-gray-400">Sunday recovery — you've earned it.</p>
+              <p className="text-sm text-gray-400">Recovery is part of training.</p>
             </div>
           </div>
         </Card>
@@ -206,7 +242,11 @@ export default function Dashboard() {
       <Card variant="elevated" padding="sm">
         <SectionHeader title="This Week" />
         <div className="grid grid-cols-7 gap-1">
-          {weekWorkouts.map(({ offset, dayLabel, workout, isRest, isToday, isPast, isRaceDay: rd }) => (
+          {weekWorkouts.map(({ offset, dayLabel, date, workout, isRest, isToday, isPast, isRaceDay: rd }) => {
+            const dateStr = date ? format(date, 'yyyy-MM-dd') : null
+            const act = dateStr ? activitiesByDate[dateStr] : null
+            const actMi = act?.distance ? (act.distance / 1609.34).toFixed(0) : null
+            return (
             <div
               key={offset}
               className={[
@@ -220,18 +260,20 @@ export default function Dashboard() {
               <div className={[
                 'w-2 h-2 rounded-full',
                 rd      ? 'bg-yellow-400'  :
+                act     ? 'bg-green-500'   :
                 isRest  ? 'bg-white/10'    :
-                isPast  ? 'bg-blue-700'    :
+                isPast  ? 'bg-white/20'    :
                 isToday ? 'bg-blue-400'    :
                           'bg-white/20',
               ].join(' ')} />
-              {!isRest && !rd && (
-                <span className="text-[9px] text-gray-600 leading-none">
-                  {workout ? Math.round(workout.steps.reduce((s, st) => s + (parseInt(st.duration,10)||0), 0) / 60) : ''}m
+              {!rd && (
+                <span className={`text-[9px] leading-none ${act ? 'text-green-500' : 'text-gray-600'}`}>
+                  {act && actMi ? `${actMi}mi` :
+                   !isRest && workout?.steps ? `${Math.round(workout.steps.reduce((s, st) => s + (parseInt(st.duration,10)||0), 0) / 60)}m` : ''}
                 </span>
               )}
             </div>
-          ))}
+          )})}
         </div>
         {weekPlannedMiles > 0 && (
           <div className="mt-3 pt-3 border-t border-white/5">
