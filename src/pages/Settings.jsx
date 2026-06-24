@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { differenceInCalendarDays, startOfDay } from 'date-fns'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import { getItem, setItem, removeItem, clearAll } from '../lib/storage'
 import { PLAN_START_DATE_DEFAULT, RACE_DAY_OFFSET, getDayOffset } from '../lib/trainingPlan'
 import Card from '../components/ui/Card'
@@ -7,11 +8,10 @@ import { useWhoop } from '../hooks/useWhoop'
 
 const RACE_DATE = '2026-08-01'
 
-function getDaysToRace(planStartDate) {
+function getDaysToRace() {
   const today = startOfDay(new Date())
   const raceDay = startOfDay(new Date(RACE_DATE + 'T00:00:00'))
-  const diff = differenceInCalendarDays(raceDay, today)
-  return diff
+  return differenceInCalendarDays(raceDay, today)
 }
 
 export default function Settings() {
@@ -20,12 +20,25 @@ export default function Settings() {
   const [confirmClear, setConfirmClear] = useState(false)
   const whoop = useWhoop()
 
-  const daysToRace = getDaysToRace(planStartDate)
+  const daysToRace = getDaysToRace()
 
-  const handleConnect = whoop.connect
+  // PWA update detection
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW()
 
-  const handleDisconnect = () => {
-    whoop.disconnect()
+  const [checking, setChecking] = useState(false)
+  const [lastChecked, setLastChecked] = useState(null)
+
+  async function handleCheckUpdate() {
+    setChecking(true)
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration()
+      if (reg) await reg.update()
+    } catch {}
+    setChecking(false)
+    setLastChecked(new Date())
   }
 
   const handleClearAll = () => {
@@ -45,7 +58,6 @@ export default function Settings() {
         <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 px-1">Training Plan</p>
         <Card variant="default" padding="none">
           <div className="px-4">
-            {/* Plan start date */}
             <div className="flex items-center justify-between py-3">
               <div>
                 <p className="text-sm font-medium text-white">Plan Start Date</p>
@@ -61,7 +73,6 @@ export default function Settings() {
 
             <div className="border-t border-white/5" />
 
-            {/* Race date (read-only) */}
             <div className="flex items-center justify-between py-3">
               <div>
                 <p className="text-sm font-medium text-white">Race Day</p>
@@ -72,7 +83,6 @@ export default function Settings() {
 
             <div className="border-t border-white/5" />
 
-            {/* Days to race countdown */}
             <div className="flex items-center justify-between py-3">
               <p className="text-sm font-medium text-white">Days to Race</p>
               <p className="text-sm font-bold text-blue-400">{daysToRace > 0 ? daysToRace : 'Race complete!'}</p>
@@ -92,11 +102,11 @@ export default function Settings() {
                 <p className="text-xs text-gray-500">{whoop.connected ? 'Connected' : 'Not connected'}</p>
               </div>
               {whoop.connected ? (
-                <button onClick={handleDisconnect} className="text-sm text-red-400 font-medium hover:text-red-300 transition-colors">
+                <button onClick={whoop.disconnect} className="text-sm text-red-400 font-medium hover:text-red-300 transition-colors">
                   Disconnect
                 </button>
               ) : (
-                <button onClick={handleConnect} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors">
+                <button onClick={whoop.connect} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors">
                   Connect
                 </button>
               )}
@@ -133,6 +143,50 @@ export default function Settings() {
         </Card>
       </section>
 
+      {/* App / Updates section */}
+      <section>
+        <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 px-1">App</p>
+        <Card variant="default" padding="none">
+          <div className="px-4">
+            <div className="flex items-center justify-between py-3">
+              <p className="text-sm font-medium text-white">Version</p>
+              <p className="text-sm text-gray-500">v0.1.0</p>
+            </div>
+
+            <div className="border-t border-white/5" />
+
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <p className="text-sm font-medium text-white">Updates</p>
+                <p className="text-xs text-gray-500">
+                  {needRefresh
+                    ? 'Update ready to install'
+                    : lastChecked
+                      ? `Checked · up to date`
+                      : 'Tap Check to look for updates'}
+                </p>
+              </div>
+              {needRefresh ? (
+                <button
+                  onClick={() => updateServiceWorker(true)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  Reload
+                </button>
+              ) : (
+                <button
+                  onClick={handleCheckUpdate}
+                  disabled={checking}
+                  className="px-3 py-1.5 border border-white/10 rounded-lg text-sm text-gray-300 hover:text-white hover:border-white/20 transition-colors disabled:opacity-40"
+                >
+                  {checking ? 'Checking…' : 'Check'}
+                </button>
+              )}
+            </div>
+          </div>
+        </Card>
+      </section>
+
       {/* Data section */}
       <section>
         <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 px-1">Data</p>
@@ -164,10 +218,8 @@ export default function Settings() {
         </Card>
       </section>
 
-      {/* App info */}
       <div className="text-center py-4">
-        <p className="text-xs text-gray-700">Kadence v0.1.0</p>
-        <p className="text-xs text-gray-700 mt-1">47-Mile Road Race · Aug 1, 2026</p>
+        <p className="text-xs text-gray-700">Kadence · 47-Mile Road Race · Aug 1, 2026</p>
       </div>
     </div>
   )
