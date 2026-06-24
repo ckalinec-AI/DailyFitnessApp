@@ -10,7 +10,9 @@
     @apply bg-gray-900 text-gray-50 font-inter;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    height: 100%;
     overflow: hidden;
+    overscroll-behavior: none;
   }
 
   ::-webkit-scrollbar {
