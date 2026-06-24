@@ -90,6 +90,12 @@ export async function fetchSleep(accessToken) {
   return data.records?.[0] ?? null
 }
 
+// GET /v2/cycle — returns today's strain score or null
+export async function fetchCycle(accessToken) {
+  const data = await whoopFetch('/v2/cycle?limit=1', accessToken)
+  return data.records?.[0] ?? null
+}
+
 // GET /v2/recovery for last N days (for HRV trend)
 export async function fetchRecoveryHistory(accessToken, days = 30) {
   const start = new Date(Date.now() - days * 86400000).toISOString()

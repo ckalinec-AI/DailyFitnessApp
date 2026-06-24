@@ -11,7 +11,7 @@ import {
   StatDisplay,
   SectionHeader,
   ProgressBar,
-  RecoveryRing,
+  MetricRing,
   NudgeBanner,
 } from '../components/ui'
 
@@ -29,13 +29,14 @@ export default function Dashboard() {
   const plan = usePlan()
 
   const whoop = useWhoop()
-  const recovery = whoop.connected && whoop.recoveryData ? {
-    score: whoop.recoveryData.score ?? 74,
-    hrv: whoop.recoveryData.hrv ?? 45,
-    rhr: whoop.recoveryData.rhr ?? 58,
-    sleepPct: whoop.sleepData?.sleepPct ?? 87,
-    synced: whoop.lastSyncedMins ?? 12,
-  } : { score: 74, hrv: 45, rhr: 58, sleepPct: 87, synced: null }
+  const recovery = {
+    score:    whoop.recoveryData?.score    ?? null,
+    hrv:      whoop.recoveryData?.hrv      ?? null,
+    rhr:      whoop.recoveryData?.rhr      ?? null,
+    sleepPct: whoop.sleepData?.sleepPct    ?? null,
+    strain:   whoop.strainData?.strain     ?? null,
+    synced:   whoop.lastSyncedMins         ?? null,
+  }
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
 
   // Weight tracking state
@@ -60,7 +61,7 @@ export default function Dashboard() {
   }
 
   const nudge = (() => {
-    if (!plan.todayDetails || nudgeDismissed) return null
+    if (!plan.todayDetails || nudgeDismissed || recovery.score == null) return null
     const { intensity } = plan.todayDetails
     if (recovery.score <= 33 && (intensity === 'threshold' || intensity === 'tempo')) {
       return { type: 'warning', message: "Your body's working hard overnight. Zone 2 today would still build fitness." }
@@ -112,22 +113,35 @@ export default function Dashboard() {
 
       {/* Recovery card */}
       <Card variant="glow">
-        <SectionHeader title="Recovery" />
-        <div className="flex items-center gap-5">
-          <RecoveryRing score={recovery.score} size="lg" />
-          <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-3">
-            <StatDisplay value={recovery.hrv}      unit="ms"  label="HRV"        size="md" />
-            <StatDisplay value={recovery.rhr}      unit="bpm" label="Resting HR"  size="md" />
-            <StatDisplay value={recovery.sleepPct} unit="%"   label="Sleep"       size="md" />
-            <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Status</p>
-              <Badge variant="recovery" size="sm">Optimal</Badge>
-            </div>
-          </div>
+        <div className="flex justify-around items-center py-2">
+          <MetricRing
+            value={recovery.sleepPct != null ? Math.round(recovery.sleepPct) : null}
+            pct={recovery.sleepPct ?? 0}
+            label="Sleep"
+            color="#60A5FA"
+            unit="%"
+          />
+          <MetricRing
+            value={recovery.score != null ? Math.round(recovery.score) : null}
+            pct={recovery.score ?? 0}
+            label="Recovery"
+            color={recovery.score == null ? '#6B7280' : recovery.score >= 67 ? '#10B981' : recovery.score >= 34 ? '#F59E0B' : '#EF4444'}
+            unit="%"
+          />
+          <MetricRing
+            value={recovery.strain != null ? Number(recovery.strain).toFixed(1) : null}
+            pct={recovery.strain != null ? (recovery.strain / 21) * 100 : 0}
+            label="Strain"
+            color="#3B82F6"
+          />
         </div>
-        <p className="text-xs text-gray-600 mt-3">
+        <p className="text-xs text-center mt-1">
           {whoop.connected
-            ? recovery.synced !== null ? `Last synced ${recovery.synced} min ago` : 'Syncing...'
+            ? whoop.error
+              ? <span className="text-yellow-600/80">{whoop.error}</span>
+              : recovery.synced !== null
+                ? <span className="text-gray-600">Last synced {recovery.synced} min ago</span>
+                : <span className="text-gray-600">Syncing...</span>
             : <button onClick={whoop.connect} className="text-blue-500 hover:text-blue-400 transition-colors">Connect Whoop →</button>
           }
         </p>

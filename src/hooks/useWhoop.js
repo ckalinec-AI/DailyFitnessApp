@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { getItem, setItem, removeItem } from '../lib/storage'
 import {
   buildAuthUrl, exchangeCode, refreshAccessToken,
-  fetchRecovery, fetchSleep,
+  fetchRecovery, fetchSleep, fetchCycle,
 } from '../lib/whoop'
 
 export function useWhoop() {
@@ -11,6 +11,7 @@ export function useWhoop() {
   const [error, setError] = useState(null)
   const [recoveryData, setRecoveryData] = useState(null)
   const [sleepData, setSleepData] = useState(null)
+  const [strainData, setStrainData] = useState(null)
   const refreshingRef = useRef(false)
 
   // Get a valid access token (refreshes if expired)
@@ -50,9 +51,11 @@ export function useWhoop() {
     removeItem('whoop_token_expiry')
     removeItem('whoop_recovery_cache')
     removeItem('whoop_sleep_cache')
+    removeItem('whoop_strain_cache')
     setConnected(false)
     setRecoveryData(null)
     setSleepData(null)
+    setStrainData(null)
   }, [])
 
   const connect = useCallback(async () => {
@@ -67,10 +70,15 @@ export function useWhoop() {
       const token = await getValidToken()
       if (!token) { setLoading(false); return }
 
-      const [rec, sleep] = await Promise.all([
+      const [rec, sleep, cycle] = await Promise.all([
         fetchRecovery(token).catch(() => null),
         fetchSleep(token).catch(() => null),
+        fetchCycle(token).catch(() => null),
       ])
+
+      if (!rec && !sleep && !cycle) {
+        setError('Could not fetch Whoop data — check your connection.')
+      }
 
       if (rec) {
         const parsed = {
@@ -91,6 +99,15 @@ export function useWhoop() {
         setSleepData(parsed)
         setItem('whoop_sleep_cache', parsed)
       }
+
+      if (cycle) {
+        const parsed = {
+          strain: cycle.score?.strain ?? null,
+          updatedAt: cycle.updated_at,
+        }
+        setStrainData(parsed)
+        setItem('whoop_strain_cache', parsed)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -102,8 +119,10 @@ export function useWhoop() {
   useEffect(() => {
     const cachedRec = getItem('whoop_recovery_cache', null)
     const cachedSleep = getItem('whoop_sleep_cache', null)
+    const cachedStrain = getItem('whoop_strain_cache', null)
     if (cachedRec) setRecoveryData(cachedRec)
     if (cachedSleep) setSleepData(cachedSleep)
+    if (cachedStrain) setStrainData(cachedStrain)
 
     if (connected) syncData()
   }, [connected])
@@ -119,6 +138,7 @@ export function useWhoop() {
     error,
     recoveryData,
     sleepData,
+    strainData,
     lastSyncedMins,
     connect,
     disconnect,
