@@ -3,7 +3,8 @@ import { getItem, setItem } from '../lib/storage'
 
 const CACHE_KEY = 'kadence_weather_cache'
 const LOCATION_KEY = 'kadence_weather_location'
-const CACHE_TTL_MS = 30 * 60 * 1000 // 30 minutes
+const CACHE_TTL_MS = 30 * 60 * 1000     // 30 minutes
+const LOCATION_TTL_MS = 12 * 60 * 60 * 1000 // 12 hours
 
 // WMO weather code → { label, icon, clear }
 const WMO = {
@@ -60,19 +61,20 @@ export function useWeather() {
     setError(null)
 
     try {
-      // Get location (use cached coords if available)
+      // Get location — re-request after 12 hours or if cache is absent
       let lat, lon
       const cachedLoc = getItem(LOCATION_KEY, null)
-      if (cachedLoc) {
+      const locFresh = cachedLoc && (Date.now() - (cachedLoc.fetchedAt ?? 0)) < LOCATION_TTL_MS
+      if (locFresh) {
         lat = cachedLoc.lat
         lon = cachedLoc.lon
       } else {
         const pos = await new Promise((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 })
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, enableHighAccuracy: true })
         )
         lat = pos.coords.latitude
         lon = pos.coords.longitude
-        setItem(LOCATION_KEY, { lat, lon })
+        setItem(LOCATION_KEY, { lat, lon, fetchedAt: Date.now() })
       }
 
       const url = new URL('https://api.open-meteo.com/v1/forecast')
@@ -82,7 +84,6 @@ export function useWeather() {
         'temperature_2m',
         'weather_code',
         'wind_speed_10m',
-        'precipitation_probability',
       ].join(','))
       url.searchParams.set('hourly', 'precipitation_probability')
       url.searchParams.set('temperature_unit', 'fahrenheit')
@@ -97,11 +98,13 @@ export function useWeather() {
       const cur = json.current
       const wmo = getWmo(cur.weather_code)
 
-      // Max precip probability over next 6 hours
+      // Max precip probability over next 6 hours (hourly array is local-time indexed)
       const hourly = json.hourly?.precipitation_probability ?? []
       const nowHour = new Date().getHours()
       const next6 = hourly.slice(nowHour, nowHour + 6)
-      const maxPrecipPct = next6.length ? Math.max(...next6) : (cur.precipitation_probability ?? 0)
+      // Round to nearest 5 and treat anything < 10 as negligible (model noise)
+      const rawMax = next6.length ? Math.max(...next6) : 0
+      const maxPrecipPct = rawMax < 10 ? 0 : Math.round(rawMax / 5) * 5
 
       const data = {
         tempF: Math.round(cur.temperature_2m),
@@ -115,6 +118,7 @@ export function useWeather() {
         // Cycling tips
         sunglasses: wmo.clear ? 'tinted' : 'clear',
         jacket: maxPrecipPct >= 25 || cur.temperature_2m < 55,
+        noRain: maxPrecipPct === 0,
         fetchedAt: Date.now(),
         lat,
         lon,

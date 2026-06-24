@@ -1,34 +1,99 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <!-- Dark navy → dark blue diagonal background -->
-    <linearGradient id="bgGrad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
-      <stop offset="0%"   stop-color="#0B1120"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0B1120"/>
       <stop offset="100%" stop-color="#0F2557"/>
-    </linearGradient>
-
-    <!-- Blue gradient for K arms: lighter at top, deeper at bottom -->
-    <linearGradient id="armGrad" x1="0" y1="96" x2="0" y2="416" gradientUnits="userSpaceOnUse">
-      <stop offset="0%"   stop-color="#93C5FD"/>
-      <stop offset="100%" stop-color="#1D4ED8"/>
     </linearGradient>
   </defs>
 
   <!-- Background -->
-  <rect width="512" height="512" fill="url(#bgGrad)"/>
+  <rect width="512" height="512" rx="0" fill="url(#bg)"/>
 
-  <!-- Subtle cadence ring behind the K -->
-  <circle cx="268" cy="256" r="198" fill="none" stroke="#3B82F6" stroke-width="2" opacity="0.14"/>
+  <!-- ── Rear wheel ── -->
+  <circle cx="130" cy="310" r="112" fill="none" stroke="#3B82F6" stroke-width="14"/>
+  <!-- spokes: 2 crossing lines -->
+  <line x1="130" y1="198" x2="130" y2="422" stroke="#1D4ED8" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="18"  y1="310" x2="242" y2="310" stroke="#1D4ED8" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="51"  y1="231" x2="209" y2="389" stroke="#1D4ED8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="51"  y1="389" x2="209" y2="231" stroke="#1D4ED8" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- rear hub -->
+  <circle cx="130" cy="310" r="11" fill="#2563EB"/>
+  <circle cx="130" cy="310" r="5"  fill="#93C5FD"/>
 
-  <!-- K · vertical stem (white, slightly rounded) -->
-  <rect x="108" y="96" width="86" height="320" rx="6" fill="white"/>
+  <!-- ── Front wheel ── -->
+  <circle cx="382" cy="310" r="112" fill="none" stroke="#3B82F6" stroke-width="14"/>
+  <line x1="382" y1="198" x2="382" y2="422" stroke="#1D4ED8" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="270" y1="310" x2="494" y2="310" stroke="#1D4ED8" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="303" y1="231" x2="461" y2="389" stroke="#1D4ED8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="303" y1="389" x2="461" y2="231" stroke="#1D4ED8" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- front hub -->
+  <circle cx="382" cy="310" r="11" fill="#2563EB"/>
+  <circle cx="382" cy="310" r="5"  fill="#93C5FD"/>
 
-  <!-- K · upper diagonal arm (blue gradient)
-       corners: stem-junction-top (194,220), arm-tip-top (400,96),
-                arm-tip-bottom (400,167), notch (194,256) -->
-  <polygon points="194,220 400,96 400,167 194,256" fill="url(#armGrad)"/>
+  <!-- ── Bottom bracket ── -->
+  <circle cx="256" cy="315" r="18" fill="none" stroke="white" stroke-width="5"/>
+  <circle cx="256" cy="315" r="7"  fill="white"/>
 
-  <!-- K · lower diagonal arm (blue gradient, mirror of upper)
-       corners: notch (194,256), arm-tip-top (400,345),
-                arm-tip-bottom (400,416), stem-junction-bottom (194,292) -->
-  <polygon points="194,256 400,345 400,416 194,292" fill="url(#armGrad)"/>
+  <!-- Chainring -->
+  <circle cx="256" cy="315" r="32" fill="none" stroke="white" stroke-width="4.5" opacity="0.6"/>
+
+  <!-- ── Frame ── -->
+  <!-- Chain stays (BB → rear axle) -->
+  <line x1="130" y1="310" x2="256" y2="315"
+        stroke="white" stroke-width="11" stroke-linecap="round"/>
+
+  <!-- Seat tube (BB → seat cluster) -->
+  <line x1="256" y1="315" x2="232" y2="152"
+        stroke="white" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Seat stays (seat cluster → rear axle, thinner) -->
+  <line x1="232" y1="152" x2="130" y2="310"
+        stroke="white" stroke-width="7.5" stroke-linecap="round"/>
+
+  <!-- Top tube (nearly horizontal, slight drop toward head) -->
+  <line x1="232" y1="152" x2="366" y2="170"
+        stroke="white" stroke-width="10.5" stroke-linecap="round"/>
+
+  <!-- Down tube (diagonal, thicker) -->
+  <line x1="256" y1="315" x2="366" y2="210"
+        stroke="white" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Head tube (short, chunky) -->
+  <line x1="366" y1="170" x2="368" y2="210"
+        stroke="white" stroke-width="17" stroke-linecap="round"/>
+
+  <!-- Fork (slight rake toward front) -->
+  <line x1="368" y1="210" x2="382" y2="310"
+        stroke="white" stroke-width="9.5" stroke-linecap="round"/>
+
+  <!-- ── Cockpit ── -->
+  <!-- Seat post -->
+  <line x1="232" y1="152" x2="230" y2="124"
+        stroke="white" stroke-width="9" stroke-linecap="round"/>
+
+  <!-- Saddle (slightly swept-back) -->
+  <path d="M 208 120 Q 230 114 260 118"
+        fill="none" stroke="white" stroke-width="9" stroke-linecap="round"/>
+
+  <!-- Stem (rises slightly from head tube top) -->
+  <line x1="366" y1="170" x2="375" y2="146"
+        stroke="white" stroke-width="9" stroke-linecap="round"/>
+
+  <!-- Handlebar tops (road bike: wide flat section) -->
+  <line x1="356" y1="142" x2="396" y2="142"
+        stroke="white" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Drop bar left -->
+  <path d="M 356 142 Q 348 160 356 184"
+        fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Drop bar right -->
+  <path d="M 396 142 Q 404 160 396 184"
+        fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- ── Cranks ── -->
+  <line x1="256" y1="315" x2="256" y2="347"
+        stroke="white" stroke-width="7.5" stroke-linecap="round"/>
+  <!-- pedal -->
+  <rect x="246" y="345" width="22" height="7" rx="2.5" fill="white"/>
 </svg>

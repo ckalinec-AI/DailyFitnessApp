@@ -270,7 +270,9 @@ export default function Dashboard() {
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-400">
                   <span>💨 {weather.windMph} mph</span>
-                  <span>🌧 {weather.precipPct}% rain (next 6h)</span>
+                  {!weather.noRain && (
+                    <span>🌧 {weather.precipPct}% rain chance</span>
+                  )}
                 </div>
               </>
             ) : null}
@@ -299,7 +301,10 @@ export default function Dashboard() {
         {weather && (
           <div className="mt-2 border-t border-white/5 pt-2 flex items-center justify-between">
             <p className="text-[10px] text-gray-700">
-              {weather.rainRisk === 'high' ? '⚠️ High rain risk' : weather.rainRisk === 'moderate' ? 'Moderate rain chance' : 'Ride conditions look good'}
+              {weather.rainRisk === 'high' ? '⚠️ High rain risk — pack a jacket'
+               : weather.rainRisk === 'moderate' ? 'Moderate rain chance'
+               : weather.noRain ? 'No rain expected'
+               : 'Ride conditions look good'}
             </p>
             <button
               onClick={() => refreshWeather({ forceRefresh: true })}
