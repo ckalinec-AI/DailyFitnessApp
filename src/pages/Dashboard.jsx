@@ -55,11 +55,19 @@ export default function Dashboard() {
   const plan = usePlan()
   const whoop = useWhoop()
   const { events, eventsByDate, activitiesByDate } = useIntervals()
-  const { weather, loading: weatherLoading, error: weatherError, refresh: refreshWeather } = useWeather()
 
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const todayEvent = eventsByDate[todayStr] ?? null
   const todayActivity = activitiesByDate[todayStr] ?? null
+
+  // Ride duration for the weather window: intervals.icu moving_time (seconds) or plan duration (minutes)
+  const rideDurationMins = useMemo(() => {
+    if (todayEvent?.moving_time > 0) return Math.round(todayEvent.moving_time / 60)
+    if (plan.todayDetails?.duration > 0) return plan.todayDetails.duration
+    return 60
+  }, [todayEvent, plan.todayDetails])
+
+  const { weather, loading: weatherLoading, error: weatherError, refresh: refreshWeather } = useWeather({ rideDurationMins })
   const recovery = {
     score:    whoop.recoveryData?.score    ?? null,
     hrv:      whoop.recoveryData?.hrv      ?? null,
@@ -254,7 +262,12 @@ export default function Dashboard() {
       {/* Weather card */}
       <Card variant="default">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Weather</p>
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Weather</p>
+            {weather?.windowLabel && (
+              <p className="text-[10px] text-gray-600 mt-0.5">{weather.windowLabel}</p>
+            )}
+          </div>
           <button
             onClick={() => refreshWeather({ forceRefresh: true })}
             className="text-[10px] text-gray-700 hover:text-gray-400 transition-colors"

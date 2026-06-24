@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getItem, setItem } from '../lib/storage'
 
-const CACHE_KEY = 'kadence_weather_cache_v2'
+const CACHE_KEY = 'kadence_weather_cache_v3'
 const LOCATION_KEY = 'kadence_weather_location'
 const CACHE_TTL_MS = 30 * 60 * 1000
 const LOCATION_TTL_MS = 12 * 60 * 60 * 1000
+const BUFFER_MINS = 60 // "get ready + possible late start" buffer after ride end
 
 const WMO = {
   0:  { label: 'Clear sky',          icon: '☀️' },
@@ -42,15 +43,65 @@ function degreesToCompass(deg) {
   return dirs[Math.round(deg / 45) % 8]
 }
 
-export function useWeather() {
-  const [weather, setWeather] = useState(() => getItem(CACHE_KEY, null))
+function fmtTime(date) {
+  const h = date.getHours() % 12 || 12
+  const m = date.getMinutes()
+  const ampm = date.getHours() >= 12 ? 'PM' : 'AM'
+  return m === 0 ? `${h} ${ampm}` : `${h}:${m.toString().padStart(2, '0')} ${ampm}`
+}
+
+// Derive precipitation stats for the ride window from raw hourly arrays.
+// Window = now → now + rideDurationMins + BUFFER_MINS
+function calcRideWindow(raw, rideDurationMins) {
+  const now = new Date()
+  const nowHour = now.getHours()
+  const windowMins = rideDurationMins + BUFFER_MINS
+  const endDate = new Date(now.getTime() + windowMins * 60 * 1000)
+  // Include the current partial hour plus all hours up to endDate's hour
+  const endHour = Math.min(endDate.getHours(), 23)
+  // Slice is inclusive of nowHour, exclusive of endHour+1
+  const numHours = Math.max(1, endHour - nowHour + 1)
+
+  const probSlice = (raw.hourlyPrecipProb ?? []).slice(nowHour, nowHour + numHours)
+  const amtSlice  = (raw.hourlyPrecipAmt  ?? []).slice(nowHour, nowHour + numHours)
+
+  const rawMaxPct = probSlice.length ? Math.max(...probSlice) : 0
+  const precipPct = rawMaxPct < 10 ? 0 : Math.round(rawMaxPct / 5) * 5
+
+  const totalIn = amtSlice.reduce((s, v) => s + (v ?? 0), 0)
+  const precipIn = totalIn < 0.01 ? 0 : parseFloat(totalIn.toFixed(2))
+
+  const windowLabel = `${fmtTime(now)} – ${fmtTime(endDate)}`
+
+  return { precipPct, precipIn, windowLabel, windowMins }
+}
+
+// rideDurationMins: planned ride length; pass 0 or omit if no ride today
+export function useWeather({ rideDurationMins = 60 } = {}) {
+  const [raw, setRaw] = useState(() => getItem(CACHE_KEY, null))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  // Recalculate window stats whenever ride duration or raw data changes
+  const weather = useMemo(() => {
+    if (!raw) return null
+    const window = calcRideWindow(raw, rideDurationMins)
+    return {
+      tempF:      raw.tempF,
+      condition:  raw.condition,
+      icon:       raw.icon,
+      cloudPct:   raw.cloudPct,
+      windMph:    raw.windMph,
+      windDir:    raw.windDir,
+      ...window,
+      fetchedAt:  raw.fetchedAt,
+    }
+  }, [raw, rideDurationMins])
 
   const fetchWeather = useCallback(async ({ forceRefresh = false } = {}) => {
     const cached = getItem(CACHE_KEY, null)
     if (!forceRefresh && cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-      setWeather(cached)
+      setRaw(cached)
       return
     }
 
@@ -99,36 +150,24 @@ export function useWeather() {
 
       const cur = json.current
       const wmo = getWmo(cur.weather_code)
-      const nowHour = new Date().getHours()
 
-      // Precip probability: max over next 6h, suppress model noise < 10%
-      const precipProbHourly = json.hourly?.precipitation_probability ?? []
-      const next6Prob = precipProbHourly.slice(nowHour, nowHour + 6)
-      const rawMaxPct = next6Prob.length ? Math.max(...next6Prob) : 0
-      const precipPct = rawMaxPct < 10 ? 0 : Math.round(rawMaxPct / 5) * 5
-
-      // Total expected precip over next 6h in inches
-      const precipAmtHourly = json.hourly?.precipitation ?? []
-      const next6Amt = precipAmtHourly.slice(nowHour, nowHour + 6)
-      const totalPrecipIn = next6Amt.reduce((s, v) => s + (v ?? 0), 0)
-      const precipIn = totalPrecipIn < 0.01 ? 0 : parseFloat(totalPrecipIn.toFixed(2))
-
-      const data = {
-        tempF: Math.round(cur.temperature_2m),
+      const rawData = {
+        tempF:    Math.round(cur.temperature_2m),
         condition: wmo.label,
-        icon: wmo.icon,
+        icon:     wmo.icon,
         cloudPct: Math.round(cur.cloud_cover ?? 0),
-        windMph: Math.round(cur.wind_speed_10m),
-        windDir: degreesToCompass(cur.wind_direction_10m ?? 0),
-        precipPct,
-        precipIn,
+        windMph:  Math.round(cur.wind_speed_10m),
+        windDir:  degreesToCompass(cur.wind_direction_10m ?? 0),
+        // Store full 24-hour arrays so window can be recalculated without refetching
+        hourlyPrecipProb: json.hourly?.precipitation_probability ?? [],
+        hourlyPrecipAmt:  json.hourly?.precipitation ?? [],
         fetchedAt: Date.now(),
         lat,
         lon,
       }
 
-      setItem(CACHE_KEY, data)
-      setWeather(data)
+      setItem(CACHE_KEY, rawData)
+      setRaw(rawData)
     } catch (err) {
       if (err.code === 1) {
         setError('Location access denied — enable in browser settings.')
