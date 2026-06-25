@@ -38,7 +38,7 @@ function MoonIcon() {
 // ── Section 1: Weight Trend ────────────────────────────────────────────────
 
 function WeightSection() {
-  const { connected: whoopConnected, bodyData } = useWhoop()
+  const { connected: whoopConnected, bodyData, bodyError } = useWhoop()
 
   const weightLog = useMemo(() => {
     try {
@@ -55,32 +55,22 @@ function WeightSection() {
     ? (last.weight - first.weight).toFixed(1)
     : null
 
+  const syncBadge = (() => {
+    if (!whoopConnected) return { color: 'bg-gray-600', text: 'Connect Whoop to auto-sync weight', textClass: 'text-gray-600' }
+    if (bodyData?.weightLbs) return { color: 'bg-green-500', text: `Syncing from Whoop · ${bodyData.weightLbs} lbs`, textClass: 'text-gray-400' }
+    if (bodyError === 'scope') return { color: 'bg-yellow-500', text: 'Reconnect Whoop to grant body measurement access', textClass: 'text-gray-500' }
+    if (bodyError === 'no_weight') return { color: 'bg-yellow-500', text: 'Set your weight in the Whoop app to sync', textClass: 'text-gray-500' }
+    return { color: 'bg-yellow-500', text: 'Body data unavailable — try reconnecting Whoop', textClass: 'text-gray-500' }
+  })()
+
   return (
     <Card variant="default">
       <SectionHeader title="Weight" />
 
       {/* Whoop sync badge */}
       <div className="flex items-center gap-1.5 mb-3 text-xs">
-        {whoopConnected ? (
-          bodyData?.weightLbs ? (
-            <>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-              <span className="text-gray-400">
-                Syncing from Whoop · {bodyData.weightLbs} lbs
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 shrink-0" />
-              <span className="text-gray-500">Whoop connected — waiting for body data</span>
-            </>
-          )
-        ) : (
-          <>
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-600 shrink-0" />
-            <span className="text-gray-600">Connect Whoop to auto-sync weight from Apple Health</span>
-          </>
-        )}
+        <span className={`w-1.5 h-1.5 rounded-full ${syncBadge.color} shrink-0`} />
+        <span className={syncBadge.textClass}>{syncBadge.text}</span>
       </div>
 
       {hasData ? (

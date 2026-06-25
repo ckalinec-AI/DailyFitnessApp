@@ -14,6 +14,7 @@ export function useWhoop() {
   const [sleepData, setSleepData] = useState(null)
   const [strainData, setStrainData] = useState(null)
   const [bodyData, setBodyData] = useState(() => getItem('whoop_body_cache', null))
+  const [bodyError, setBodyError] = useState(null)
   const refreshingRef = useRef(false)
 
   // Get a valid access token (refreshes if expired)
@@ -129,7 +130,13 @@ export function useWhoop() {
         setItem('whoop_strain_cache', parsed)
       }
 
-      if (body?.weight_kilogram) {
+      const bodyReason = bodyResult.status === 'rejected'
+        ? (bodyResult.reason?.status === 403 ? 'scope' : 'error')
+        : (body != null && !body.weight_kilogram) ? 'no_weight'
+        : null
+      setBodyError(body?.weight_kilogram > 0 ? null : bodyReason)
+
+      if (body?.weight_kilogram > 0) {
         const weightLbs = body.weight_kilogram * 2.20462
         const parsed = {
           weightLbs: parseFloat(weightLbs.toFixed(1)),
@@ -175,6 +182,7 @@ export function useWhoop() {
     sleepData,
     strainData,
     bodyData,
+    bodyError,
     lastSyncedMins,
     connect,
     disconnect,
