@@ -358,16 +358,26 @@ export default function TrainingPlan() {
 
   const currentWeekIndex = weeks.findIndex(w => w.containsToday)
 
-  // Scroll current week to top on mount
+  // Scroll current week to top on mount (explicit mainEl.scrollTop — avoids
+  // scrollIntoView which can scroll window on iOS and misalign the fixed nav)
   useEffect(() => {
-    const timer = setTimeout(() => {
+    let cancelled = false
+    const tryScroll = () => {
+      if (cancelled) return
+      const mainEl = document.querySelector('main')
       const el = currentWeekRef.current
-      if (!el) return
-      // Set scroll-margin-top so scrollIntoView clears the sticky header
-      el.style.scrollMarginTop = `${headerRef.current?.offsetHeight ?? 72}px`
-      el.scrollIntoView({ behavior: 'instant', block: 'start' })
-    }, 100)
-    return () => clearTimeout(timer)
+      if (!mainEl || !el) return
+      const headerH = headerRef.current?.offsetHeight ?? 72
+      const mainRect = mainEl.getBoundingClientRect()
+      const elRect = el.getBoundingClientRect()
+      const target = mainEl.scrollTop + (elRect.top - mainRect.top) - headerH
+      if (target > 0) mainEl.scrollTop = target
+    }
+    // Double-rAF: ensures layout is painted (handles fast desktop + some mobile)
+    requestAnimationFrame(() => requestAnimationFrame(tryScroll))
+    // 300ms fallback for slower mobile devices
+    const t = setTimeout(tryScroll, 300)
+    return () => { cancelled = true; clearTimeout(t) }
   }, [])
 
   return (

@@ -8,7 +8,10 @@ export function getWeightLog() {
 
 // Upserts today's entry. date is today in YYYY-MM-DD.
 export function logWeight(weightLbs) {
-  const date = new Date().toISOString().split('T')[0]
+  return logWeightForDate(new Date().toISOString().split('T')[0], weightLbs)
+}
+
+export function logWeightForDate(date, weightLbs) {
   const log = getWeightLog().filter(Boolean)
   const idx = log.findIndex(e => e.date === date)
   if (idx >= 0) {

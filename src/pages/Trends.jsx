@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import {
   ResponsiveContainer,
@@ -16,6 +16,7 @@ import EmptyState from '../components/ui/EmptyState'
 import { getDayOffset, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
 import { useIntervals } from '../hooks/useIntervals'
 import { useWhoop } from '../hooks/useWhoop'
+import { logWeightForDate } from '../lib/weight'
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,9 @@ function MoonIcon() {
 
 function WeightSection() {
   const { connected: whoopConnected, bodyData, bodyError } = useWhoop()
+  const [logKey, setLogKey] = useState(0)
+  const [manualDate, setManualDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [manualWeight, setManualWeight] = useState('')
 
   const weightLog = useMemo(() => {
     try {
@@ -46,91 +50,119 @@ function WeightSection() {
     } catch {
       return []
     }
-  }, [bodyData]) // re-read after each Whoop sync that may have written a new entry
+  }, [bodyData, logKey])
 
   const hasData = weightLog.length > 0
   const first = hasData ? weightLog[0] : null
   const last = hasData ? weightLog[weightLog.length - 1] : null
   const delta = hasData && weightLog.length > 1
-    ? (last.weight - first.weight).toFixed(1)
+    ? last.weight - first.weight
     : null
 
   const syncBadge = (() => {
     if (!whoopConnected) return { color: 'bg-gray-600', text: 'Connect Whoop to auto-sync weight', textClass: 'text-gray-600' }
-    if (bodyData?.weightLbs) return { color: 'bg-green-500', text: `Syncing from Whoop · ${bodyData.weightLbs} lbs`, textClass: 'text-gray-400' }
+    if (bodyData?.weightLbs) return { color: 'bg-green-500', text: `Syncing from Whoop · ${bodyData.weightLbs.toFixed(2)} lbs`, textClass: 'text-gray-400' }
     if (bodyError === 'scope') return { color: 'bg-yellow-500', text: 'Reconnect Whoop to grant body measurement access', textClass: 'text-gray-500' }
     if (bodyError === 'no_weight') return { color: 'bg-yellow-500', text: 'Set your weight in the Whoop app to sync', textClass: 'text-gray-500' }
     return { color: 'bg-yellow-500', text: 'Body data unavailable — try reconnecting Whoop', textClass: 'text-gray-500' }
   })()
 
+  function handleAddWeight(e) {
+    e.preventDefault()
+    const w = parseFloat(manualWeight)
+    if (!manualDate || isNaN(w) || w <= 0) return
+    logWeightForDate(manualDate, w)
+    setManualWeight('')
+    setLogKey(k => k + 1)
+  }
+
   return (
     <Card variant="default">
-      <SectionHeader title="Weight" />
+      {/* Header row: title left, delta right */}
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Weight</p>
+        {delta !== null && (
+          <span className={`text-sm font-bold ${delta < 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {delta > 0 ? '+' : ''}{delta.toFixed(2)} lbs
+          </span>
+        )}
+      </div>
 
-      {/* Whoop sync badge */}
-      <div className="flex items-center gap-1.5 mb-3 text-xs">
+      {/* Current weight */}
+      {hasData && (
+        <p className="text-2xl font-black text-white mb-3">{last.weight.toFixed(2)} <span className="text-sm font-medium text-gray-400">lbs</span></p>
+      )}
+
+      {hasData ? (
+        <ResponsiveContainer width="100%" height={140}>
+          <AreaChart data={weightLog} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <defs>
+              <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis
+              dataKey="date"
+              tick={{ fill: '#4B5563', fontSize: 10 }}
+              tickFormatter={d => format(new Date(d + 'T00:00:00'), 'M/d')}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tick={{ fill: '#4B5563', fontSize: 10 }}
+              domain={['dataMin - 3', 'dataMax + 3']}
+            />
+            <Tooltip
+              contentStyle={{ background: '#1F2937', border: '1px solid #374151', borderRadius: 8 }}
+              labelStyle={{ color: '#9CA3AF', fontSize: 11 }}
+              itemStyle={{ color: '#fff' }}
+              formatter={v => [`${Number(v).toFixed(2)} lbs`, 'Weight']}
+            />
+            <Area
+              type="monotone"
+              dataKey="weight"
+              stroke="#3B82F6"
+              strokeWidth={2}
+              fill="url(#weightGrad)"
+              dot={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      ) : (
+        <p className="text-sm text-gray-600 text-center py-4">No weight data yet — add an entry below</p>
+      )}
+
+      {/* Manual entry */}
+      <form onSubmit={handleAddWeight} className="flex items-center gap-2 mt-3">
+        <input
+          type="date"
+          value={manualDate}
+          onChange={e => setManualDate(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/50 [color-scheme:dark] flex-shrink-0"
+        />
+        <input
+          type="number"
+          value={manualWeight}
+          onChange={e => setManualWeight(e.target.value)}
+          placeholder="lbs"
+          step="0.01"
+          min="50"
+          max="500"
+          className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 w-20 flex-shrink-0"
+        />
+        <button
+          type="submit"
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors flex-shrink-0"
+        >
+          Add
+        </button>
+      </form>
+
+      {/* Sync status */}
+      <div className="flex items-center gap-1.5 mt-3 text-xs">
         <span className={`w-1.5 h-1.5 rounded-full ${syncBadge.color} shrink-0`} />
         <span className={syncBadge.textClass}>{syncBadge.text}</span>
       </div>
-
-      {hasData ? (
-        <>
-          <ResponsiveContainer width="100%" height={160}>
-            <AreaChart data={weightLog} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis
-                dataKey="date"
-                tick={{ fill: '#4B5563', fontSize: 10 }}
-                tickFormatter={d => format(new Date(d + 'T00:00:00'), 'M/d')}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                tick={{ fill: '#4B5563', fontSize: 10 }}
-                domain={['dataMin - 3', 'dataMax + 3']}
-              />
-              <Tooltip
-                contentStyle={{ background: '#1F2937', border: '1px solid #374151', borderRadius: 8 }}
-                labelStyle={{ color: '#9CA3AF', fontSize: 11 }}
-                itemStyle={{ color: '#fff' }}
-                formatter={v => [`${v} lbs`, 'Weight']}
-              />
-              <Area
-                type="monotone"
-                dataKey="weight"
-                stroke="#3B82F6"
-                strokeWidth={2}
-                fill="url(#weightGrad)"
-                dot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-          <div className="mt-2 flex items-center gap-3 text-sm">
-            <span className="text-white font-semibold">Current: {last.weight} lbs</span>
-            {delta !== null && (
-              <span className="text-gray-400">
-                Start: {first.weight} lbs &nbsp;·&nbsp; Δ {delta > 0 ? '+' : ''}{delta} lbs
-              </span>
-            )}
-          </div>
-        </>
-      ) : (
-        <EmptyState
-          icon={
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-          }
-          title="No weight data yet"
-          description={whoopConnected ? 'Weight will appear here once Whoop syncs body measurements' : 'Connect Whoop to sync weight automatically from Apple Health'}
-        />
-      )}
     </Card>
   )
 }
