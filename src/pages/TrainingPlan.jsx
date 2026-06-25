@@ -360,18 +360,13 @@ export default function TrainingPlan() {
 
   // Scroll current week to top on mount
   useEffect(() => {
-    if (!currentWeekRef.current) return
     const timer = setTimeout(() => {
-      const mainEl = document.querySelector('main')
-      const headerEl = headerRef.current
-      if (mainEl && currentWeekRef.current) {
-        const headerHeight = headerEl?.offsetHeight ?? 0
-        const containerRect = mainEl.getBoundingClientRect()
-        const elRect = currentWeekRef.current.getBoundingClientRect()
-        const targetScrollTop = mainEl.scrollTop + (elRect.top - containerRect.top) - headerHeight
-        mainEl.scrollTop = Math.max(0, targetScrollTop)
-      }
-    }, 50)
+      const el = currentWeekRef.current
+      if (!el) return
+      // Set scroll-margin-top so scrollIntoView clears the sticky header
+      el.style.scrollMarginTop = `${headerRef.current?.offsetHeight ?? 72}px`
+      el.scrollIntoView({ behavior: 'instant', block: 'start' })
+    }, 100)
     return () => clearTimeout(timer)
   }, [])
 

@@ -197,10 +197,8 @@ export default function Dashboard() {
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Kadence</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{format(new Date(), 'EEEE, MMM d')}</p>
-        </div>
+        <h1 className="text-2xl font-black text-white tracking-tight">Kadence</h1>
+        <p className="text-xs text-gray-400">{format(new Date(), 'EEEE, MMM d')}</p>
       </div>
 
       {/* Days to race countdown */}
