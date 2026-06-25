@@ -8,12 +8,22 @@ import WhoopCallback from './pages/WhoopCallback'
 
 function App() {
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-gray-50 font-inter">
+    <div
+      className="bg-gray-900 text-gray-50 font-inter"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       <main
         className="flex-1 overflow-y-auto min-h-0"
         style={{
           paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))',
           overscrollBehavior: 'none',
         }}
       >
