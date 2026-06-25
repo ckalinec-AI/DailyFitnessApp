@@ -1,17 +1,14 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
 import { getItem } from '../lib/storage'
 import {
-  getWorkoutForOffset,
   getWorkoutDuration,
   getPrimaryZone,
   getStructureSummary,
   getDateForOffset,
-  getDayOffset,
   PLAN_START_DATE_DEFAULT,
   RACE_DAY_OFFSET,
   PLAN_END_OFFSET,
-  HR_ZONES,
 } from '../lib/trainingPlan'
 import { useIntervals } from '../hooks/useIntervals'
 import { Badge } from '../components/ui'
@@ -111,16 +108,16 @@ function DayRow({ day, onSelect }) {
   )
 }
 
-function WeekSection({ weekData, currentWeek, onSelectDay }) {
-  const { week, days } = weekData
-  const isCurrent = week - 1 === currentWeek
+function WeekSection({ weekData, weekRef, onSelectDay }) {
+  const { week, days, containsToday } = weekData
+  const isCurrent = containsToday
   const isRaceWeek = days.some((d) => d.isRaceDay)
   const firstDay = days[0]
   const lastDay = days[days.length - 1]
   const rangeLabel = `${format(firstDay.date, 'MMM d')}–${format(lastDay.date, 'd')}`
 
   return (
-    <div className="mb-4">
+    <div ref={weekRef} className="mb-4">
       <div className="flex items-center gap-2 px-4 py-2">
         <span className="text-sm font-semibold text-gray-300">Week {week}</span>
         <span className="text-xs text-gray-500">· {rangeLabel}</span>
@@ -138,7 +135,7 @@ function WeekSection({ weekData, currentWeek, onSelectDay }) {
       <div className="h-px bg-gray-700/60 mx-4 mb-1" />
       <div className="bg-gray-800/40 rounded-xl mx-2 overflow-hidden border border-white/5">
         {days.map((day, i) => (
-          <div key={day.offset}>
+          <div key={day.dateStr}>
             {i > 0 && <div className="h-px bg-gray-700/30 mx-4" />}
             <DayRow day={day} onSelect={onSelectDay} />
           </div>
@@ -302,59 +299,91 @@ function WorkoutSheet({ day, onClose }) {
 
 export default function TrainingPlan() {
   const startDate = getItem('planStartDate', PLAN_START_DATE_DEFAULT)
-  const todayOffset = getDayOffset(startDate)
-  const currentWeek = Math.floor(Math.max(todayOffset, 0) / 7)
-
   const [selectedDay, setSelectedDay] = useState(null)
   const { eventsByDate, activitiesByDate, loading, error, lastSyncedMins, syncData } = useIntervals()
 
+  const headerRef = useRef(null)
+  const currentWeekRef = useRef(null)
+
   const weeks = useMemo(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd')
+    const raceDateStr = format(getDateForOffset(startDate, RACE_DAY_OFFSET), 'yyyy-MM-dd')
+
+    // First Sunday on or before plan start
+    const planStartObj = new Date(startDate + 'T12:00:00')
+    const startDow = planStartObj.getDay()
+    const firstSunday = new Date(planStartObj)
+    firstSunday.setDate(firstSunday.getDate() - startDow)
+
+    // Last Saturday on or after plan end
+    const planEndObj = getDateForOffset(startDate, PLAN_END_OFFSET)
+    const endDow = planEndObj.getDay()
+    const lastSaturday = new Date(planEndObj)
+    if (endDow !== 6) lastSaturday.setDate(lastSaturday.getDate() + (6 - endDow))
+
     const result = []
-    for (let w = 0; w < 11; w++) {
+    const cursor = new Date(firstSunday)
+    let weekNum = 1
+
+    while (cursor <= lastSaturday) {
       const days = []
       for (let d = 0; d < 7; d++) {
-        const offset = w * 7 + d
-        if (offset > PLAN_END_OFFSET + 7) break
-        const date = getDateForOffset(startDate, offset)
+        const date = new Date(cursor)
+        date.setDate(date.getDate() + d)
         const dateStr = format(date, 'yyyy-MM-dd')
 
-        // intervals.icu event takes priority; JSON workout is fallback
-        const evt = eventsByDate[dateStr]
-        const jsonWorkout = getWorkoutForOffset(offset)
-        const workout = evt
-          ? eventToWorkout(evt)
-          : jsonWorkout
-            ? { ...jsonWorkout, duration: getWorkoutDuration(jsonWorkout), _source: 'json' }
-            : null
-
+        const evt = eventsByDate[dateStr] ?? null
+        const workout = evt ? eventToWorkout(evt) : null
         const activity = activitiesByDate[dateStr] ?? null
 
         days.push({
-          offset,
           date,
+          dateStr,
           workout,
           activity,
           isRest: !workout,
-          isToday: offset === todayOffset,
-          isPast: offset < todayOffset,
-          isRaceDay: offset === RACE_DAY_OFFSET,
-          inPlan: offset <= PLAN_END_OFFSET,
+          isToday: dateStr === todayStr,
+          isPast: dateStr < todayStr,
+          isRaceDay: dateStr === raceDateStr,
         })
       }
-      result.push({ week: w + 1, days })
+
+      result.push({ week: weekNum, days, containsToday: days.some(d => d.isToday) })
+      cursor.setDate(cursor.getDate() + 7)
+      weekNum++
     }
+
     return result
-  }, [startDate, todayOffset, eventsByDate, activitiesByDate])
+  }, [startDate, eventsByDate, activitiesByDate])
+
+  const currentWeekIndex = weeks.findIndex(w => w.containsToday)
+
+  // Scroll current week to top on mount
+  useEffect(() => {
+    if (!currentWeekRef.current) return
+    const timer = setTimeout(() => {
+      const mainEl = document.querySelector('main')
+      const headerEl = headerRef.current
+      if (mainEl && currentWeekRef.current) {
+        const headerHeight = headerEl?.offsetHeight ?? 0
+        const containerRect = mainEl.getBoundingClientRect()
+        const elRect = currentWeekRef.current.getBoundingClientRect()
+        const targetScrollTop = mainEl.scrollTop + (elRect.top - containerRect.top) - headerHeight
+        mainEl.scrollTop = Math.max(0, targetScrollTop)
+      }
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [])
 
   return (
     <div className="bg-gray-900">
       {/* Sticky header */}
-      <div className="px-4 pt-3 pb-4 sticky top-0 bg-gray-900 z-10 border-b border-gray-800/60">
+      <div ref={headerRef} className="px-4 pt-3 pb-4 sticky top-0 bg-gray-900 z-10 border-b border-gray-800/60">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-50">Training Plan</h1>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center rounded-full bg-blue-500/15 border border-blue-500/25 text-blue-400 text-xs font-semibold px-3 py-1">
-              Week {Math.min(currentWeek + 1, 11)} of 11
+              {currentWeekIndex >= 0 ? `Week ${currentWeekIndex + 1} of ${weeks.length}` : `${weeks.length} Weeks`}
             </span>
             <button
               onClick={syncData}
@@ -385,7 +414,7 @@ export default function TrainingPlan() {
           <WeekSection
             key={weekData.week}
             weekData={weekData}
-            currentWeek={currentWeek}
+            weekRef={weekData.containsToday ? currentWeekRef : null}
             onSelectDay={setSelectedDay}
           />
         ))}

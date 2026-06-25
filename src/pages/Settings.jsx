@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { differenceInCalendarDays, startOfDay } from 'date-fns'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { getItem, setItem, removeItem, clearAll } from '../lib/storage'
-import { PLAN_START_DATE_DEFAULT, RACE_DAY_OFFSET, getDayOffset } from '../lib/trainingPlan'
 import Card from '../components/ui/Card'
 import { useWhoop } from '../hooks/useWhoop'
 
@@ -15,7 +14,6 @@ function getDaysToRace() {
 }
 
 export default function Settings() {
-  const [planStartDate, setPlanStartDate] = useState(() => getItem('planStartDate', PLAN_START_DATE_DEFAULT))
   const [weightUnit, setWeightUnit] = useState(() => getItem('weightUnit', 'lbs'))
   const [confirmClear, setConfirmClear] = useState(false)
   const whoop = useWhoop()
@@ -44,7 +42,6 @@ export default function Settings() {
   const handleClearAll = () => {
     clearAll()
     whoop.disconnect()
-    setPlanStartDate(PLAN_START_DATE_DEFAULT)
     setWeightUnit('lbs')
     setConfirmClear(false)
   }
@@ -58,21 +55,6 @@ export default function Settings() {
         <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 px-1">Training Plan</p>
         <Card variant="default" padding="none">
           <div className="px-4">
-            <div className="flex items-center justify-between py-3">
-              <div>
-                <p className="text-sm font-medium text-white">Plan Start Date</p>
-                <p className="text-xs text-gray-500">When your training block began</p>
-              </div>
-              <input
-                type="date"
-                value={planStartDate}
-                onChange={e => { setPlanStartDate(e.target.value); setItem('planStartDate', e.target.value) }}
-                className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white text-right focus:outline-none focus:border-blue-500/50 [color-scheme:dark]"
-              />
-            </div>
-
-            <div className="border-t border-white/5" />
-
             <div className="flex items-center justify-between py-3">
               <div>
                 <p className="text-sm font-medium text-white">Race Day</p>

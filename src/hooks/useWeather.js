@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getItem, setItem } from '../lib/storage'
 
-const CACHE_KEY = 'kadence_weather_cache_v3'
+const CACHE_KEY = 'kadence_weather_cache_v4'
 const LOCATION_KEY = 'kadence_weather_location'
 const CACHE_TTL_MS = 30 * 60 * 1000
 const LOCATION_TTL_MS = 12 * 60 * 60 * 1000
@@ -80,7 +80,10 @@ function calcRideWindow(raw, rideDurationMins) {
 
   const windowLabel = `${fmtTime(now)} – ${fmtTime(endDate)}`
 
-  return { precipPct, precipIn, windowLabel, windowMins }
+  const tempArr = raw.hourlyTemperature2m ?? []
+  const tempEnd = tempArr.length > endHour ? Math.round(tempArr[endHour]) : null
+
+  return { precipPct, precipIn, windowLabel, windowMins, tempEnd }
 }
 
 // rideDurationMins: planned ride length; pass 0 or omit if no ride today
@@ -98,6 +101,7 @@ export function useWeather({ rideDurationMins = 60 } = {}) {
       condition:  raw.condition,
       icon:       raw.icon,
       cloudPct:   raw.cloudPct,
+      cloudLabel: raw.cloudLabel,
       windMph:    raw.windMph,
       windDir:    raw.windDir,
       ...window,
@@ -144,6 +148,7 @@ export function useWeather({ rideDurationMins = 60 } = {}) {
       url.searchParams.set('hourly', [
         'precipitation_probability',
         'precipitation',
+        'temperature_2m',
       ].join(','))
       url.searchParams.set('temperature_unit', 'fahrenheit')
       url.searchParams.set('wind_speed_unit', 'mph')
@@ -167,8 +172,9 @@ export function useWeather({ rideDurationMins = 60 } = {}) {
         windMph:  Math.round(cur.wind_speed_10m),
         windDir:  degreesToCompass(cur.wind_direction_10m ?? 0),
         // Store full 24-hour arrays so window can be recalculated without refetching
-        hourlyPrecipProb: json.hourly?.precipitation_probability ?? [],
-        hourlyPrecipAmt:  json.hourly?.precipitation ?? [],
+        hourlyPrecipProb:    json.hourly?.precipitation_probability ?? [],
+        hourlyPrecipAmt:     json.hourly?.precipitation ?? [],
+        hourlyTemperature2m: json.hourly?.temperature_2m ?? [],
         fetchedAt: Date.now(),
         lat,
         lon,

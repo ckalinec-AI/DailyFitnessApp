@@ -247,33 +247,27 @@ export default function Dashboard() {
             color="#3B82F6"
           />
         </div>
-        <p className="text-xs text-center mt-1">
-          {whoop.connected
-            ? whoop.error
-              ? <span className="text-yellow-600/80">{whoop.error}</span>
-              : recovery.synced !== null
-                ? <span className="text-gray-600">Last synced {recovery.synced} min ago</span>
-                : <span className="text-gray-600">Syncing...</span>
-            : <button onClick={whoop.connect} className="text-blue-500 hover:text-blue-400 transition-colors">Connect Whoop →</button>
-          }
-        </p>
+        {whoop.connected
+          ? whoop.error && (
+              <p className="text-xs text-center mt-1">
+                <span className="text-yellow-600/80">{whoop.error}</span>
+              </p>
+            )
+          : (
+              <p className="text-xs text-center mt-1">
+                <button onClick={whoop.connect} className="text-blue-500 hover:text-blue-400 transition-colors">Connect Whoop →</button>
+              </p>
+            )
+        }
       </Card>
 
       {/* Weather card */}
       <Card variant="default">
         <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Weather</p>
-            {weather?.windowLabel && (
-              <p className="text-[10px] text-gray-600 mt-0.5">{weather.windowLabel}</p>
-            )}
-          </div>
-          <button
-            onClick={() => refreshWeather({ forceRefresh: true })}
-            className="text-[10px] text-gray-700 hover:text-gray-400 transition-colors"
-          >
-            {weatherLoading ? '…' : '↻'}
-          </button>
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Weather</p>
+          {weather?.windowLabel && (
+            <p className="text-[10px] text-gray-600">{weather.windowLabel}</p>
+          )}
         </div>
         {weatherLoading && !weather ? (
           <p className="text-sm text-gray-500 text-center py-2">Fetching weather…</p>
@@ -285,7 +279,11 @@ export default function Dashboard() {
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex items-center gap-1 leading-none">
                 <span className="text-lg leading-none">{weather.icon}</span>
-                <span className="text-xl font-black text-white leading-none">{weather.tempF}°</span>
+                <span className="text-xl font-black text-white leading-none">
+                  {weather.tempEnd != null && Math.abs(weather.tempEnd - weather.tempF) > 3
+                    ? `${weather.tempF}–${weather.tempEnd}°`
+                    : `${weather.tempF}°`}
+                </span>
               </div>
               <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest text-center leading-tight">{weather.condition}</span>
             </div>
@@ -459,13 +457,13 @@ export default function Dashboard() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Next Up</span>
-                <span className="text-[10px] text-gray-600">{nextWorkoutData.dateLabel}</span>
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{nextWorkoutData.dateLabel}</span>
               </div>
               <p className="text-sm font-bold text-white leading-tight truncate">{nextWorkoutData.name}</p>
-              {nextWorkoutData.movingTime > 0 && (
-                <p className="text-xs text-gray-500 mt-0.5">{formatDuration(nextWorkoutData.movingTime)}</p>
-              )}
             </div>
+            {nextWorkoutData.movingTime > 0 && (
+              <span className="text-xs text-gray-500 shrink-0">{formatDuration(nextWorkoutData.movingTime)}</span>
+            )}
           </div>
           {nextWorkoutData.segments.length > 0 && (
             <WorkoutChart segments={nextWorkoutData.segments} compact />

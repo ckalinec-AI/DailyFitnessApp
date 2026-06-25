@@ -13,7 +13,7 @@ import {
 import Card from '../components/ui/Card'
 import SectionHeader from '../components/ui/SectionHeader'
 import EmptyState from '../components/ui/EmptyState'
-import { getWorkoutForOffset, getDayOffset, getDateForOffset, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
+import { getDayOffset, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
 import { useIntervals } from '../hooks/useIntervals'
 import { useWhoop } from '../hooks/useWhoop'
 
@@ -148,25 +148,33 @@ function WeightSection() {
 // ── Section 2: HRV Trend ──────────────────────────────────────────────────
 
 function HRVSection() {
-  const whoopConnected = useMemo(
-    () => Boolean(localStorage.getItem('kadence_whoop_access_token')),
-    []
-  )
+  const { connected, recoveryData } = useWhoop()
+  const todayHrv = recoveryData?.hrv ?? null
 
   return (
     <Card variant="default">
-      <SectionHeader title="HRV · 30 Days" />
-      {whoopConnected ? (
-        <EmptyState
-          icon={<HeartbeatIcon />}
-          title="No HRV data"
-          description="HRV data will appear here once Whoop syncs your readings"
-        />
+      <SectionHeader title="HRV" />
+      {connected ? (
+        todayHrv != null ? (
+          <div className="py-2">
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-3xl font-black text-white">{todayHrv}</span>
+              <span className="text-sm text-gray-400">ms · today</span>
+            </div>
+            <p className="text-xs text-gray-600 mt-1">History builds as Whoop syncs daily readings</p>
+          </div>
+        ) : (
+          <EmptyState
+            icon={<HeartbeatIcon />}
+            title="No HRV data yet"
+            description="HRV will appear once Whoop syncs your readings"
+          />
+        )
       ) : (
         <EmptyState
           icon={<HeartbeatIcon />}
           title="No HRV data"
-          description="Connect your Whoop to see 30-day HRV trends"
+          description="Connect your Whoop to see HRV trends"
         />
       )}
     </Card>
@@ -195,14 +203,8 @@ function MileageSection() {
 
     const data = []
     for (let w = Math.max(0, currentWeek - 5); w <= currentWeek; w++) {
-      let planned = 0
-      for (let d = 0; d < 7; d++) {
-        const workout = getWorkoutForOffset(w * 7 + d)
-        const match = workout?.name?.match(/~(\d+)\s*mi/)
-        if (match) planned += parseInt(match[1], 10)
-      }
       const actual = actByWeek[w] ? parseFloat(actByWeek[w].toFixed(1)) : 0
-      data.push({ week: `W${w + 1}`, planned, actual })
+      data.push({ week: `W${w + 1}`, actual })
     }
     return data
   }, [activities])
@@ -221,25 +223,12 @@ function MileageSection() {
             itemStyle={{ color: '#fff' }}
             formatter={(v, name) => [`${v} mi`, name]}
           />
-          <Bar dataKey="planned" fill="#1D4ED8" opacity={0.5} radius={[3, 3, 0, 0]} name="Planned" />
-          <Bar dataKey="actual"  fill="#3B82F6" radius={[3, 3, 0, 0]} name="Actual" />
+          <Bar dataKey="actual" fill="#3B82F6" radius={[3, 3, 0, 0]} name="Actual" />
         </BarChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex items-center justify-between">
-        <div className="flex items-center gap-4 text-xs text-gray-400">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-800 opacity-50" />
-            Planned
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
-            Actual
-          </span>
-        </div>
-        {!hasActual && (
-          <span className="text-xs text-gray-600">Syncing from Intervals.icu…</span>
-        )}
-      </div>
+      {!hasActual && (
+        <p className="text-xs text-gray-600 text-center mt-2">Syncing from Intervals.icu…</p>
+      )}
     </Card>
   )
 }
