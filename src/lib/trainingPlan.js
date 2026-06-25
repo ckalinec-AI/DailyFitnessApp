@@ -26,7 +26,7 @@ export function getDayOffset(startDate, targetDate = new Date()) {
 }
 
 export function getDateForOffset(startDate, offset) {
-  return addDays(new Date(startDate), offset)
+  return addDays(new Date(startDate + 'T12:00:00'), offset)
 }
 
 export function getWorkoutForOffset(offset) {
