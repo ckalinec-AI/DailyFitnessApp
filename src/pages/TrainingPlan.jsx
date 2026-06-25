@@ -358,26 +358,31 @@ export default function TrainingPlan() {
 
   const currentWeekIndex = weeks.findIndex(w => w.containsToday)
 
-  // Scroll current week to top on mount (explicit mainEl.scrollTop — avoids
-  // scrollIntoView which can scroll window on iOS and misalign the fixed nav)
+  // Scroll current week to top on mount. Retries every 200ms until layout is
+  // ready (target > 0), because on mobile the scroll container may not have its
+  // final dimensions yet when the component first mounts.
   useEffect(() => {
-    let cancelled = false
+    let timer = null
+    let attempts = 0
     const tryScroll = () => {
-      if (cancelled) return
       const mainEl = document.querySelector('main')
       const el = currentWeekRef.current
-      if (!mainEl || !el) return
-      const headerH = headerRef.current?.offsetHeight ?? 72
-      const mainRect = mainEl.getBoundingClientRect()
-      const elRect = el.getBoundingClientRect()
-      const target = mainEl.scrollTop + (elRect.top - mainRect.top) - headerH
-      if (target > 0) mainEl.scrollTop = target
+      if (mainEl && el) {
+        const headerH = headerRef.current?.offsetHeight ?? 72
+        const mainRect = mainEl.getBoundingClientRect()
+        const elRect = el.getBoundingClientRect()
+        const target = mainEl.scrollTop + (elRect.top - mainRect.top) - headerH
+        if (target > 1) {
+          mainEl.scrollTop = target
+          return
+        }
+      }
+      if (++attempts < 10) {
+        timer = setTimeout(tryScroll, 200)
+      }
     }
-    // Double-rAF: ensures layout is painted (handles fast desktop + some mobile)
-    requestAnimationFrame(() => requestAnimationFrame(tryScroll))
-    // 300ms fallback for slower mobile devices
-    const t = setTimeout(tryScroll, 300)
-    return () => { cancelled = true; clearTimeout(t) }
+    timer = setTimeout(tryScroll, 100)
+    return () => { if (timer) clearTimeout(timer) }
   }, [])
 
   return (
