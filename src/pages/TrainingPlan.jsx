@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
 import { format } from 'date-fns'
 import { getItem } from '../lib/storage'
 import {
@@ -304,6 +304,7 @@ export default function TrainingPlan() {
 
   const headerRef = useRef(null)
   const currentWeekRef = useRef(null)
+  const scrolledRef = useRef(false)
 
   const weeks = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
@@ -358,32 +359,35 @@ export default function TrainingPlan() {
 
   const currentWeekIndex = weeks.findIndex(w => w.containsToday)
 
-  // Scroll current week to top on mount. Retries every 200ms until layout is
-  // ready (target > 0), because on mobile the scroll container may not have its
-  // final dimensions yet when the component first mounts.
+  // Scroll current week into view. Runs whenever weeks updates so it fires
+  // both on initial mount and after interval data loads. Uses rAF so the
+  // browser has fully laid out the scroll container before we read heights.
+  // scrolledRef prevents re-scrolling on subsequent data refreshes.
   useEffect(() => {
+    if (scrolledRef.current || currentWeekIndex < 0) return
     let timer = null
     let attempts = 0
     const tryScroll = () => {
-      const mainEl = document.querySelector('main')
-      const el = currentWeekRef.current
-      if (mainEl && el) {
-        const headerH = headerRef.current?.offsetHeight ?? 72
-        const mainRect = mainEl.getBoundingClientRect()
-        const elRect = el.getBoundingClientRect()
-        const target = mainEl.scrollTop + (elRect.top - mainRect.top) - headerH
-        if (target > 1) {
-          mainEl.scrollTop = target
-          return
+      requestAnimationFrame(() => {
+        const mainEl = document.querySelector('main')
+        const el = currentWeekRef.current
+        if (mainEl && el) {
+          const headerH = headerRef.current?.offsetHeight ?? 72
+          const mainRect = mainEl.getBoundingClientRect()
+          const elRect = el.getBoundingClientRect()
+          const target = mainEl.scrollTop + (elRect.top - mainRect.top) - headerH
+          if (target > 0) {
+            mainEl.scrollTop = target
+            scrolledRef.current = true
+            return
+          }
         }
-      }
-      if (++attempts < 10) {
-        timer = setTimeout(tryScroll, 200)
-      }
+        if (++attempts < 15) timer = setTimeout(tryScroll, 100)
+      })
     }
-    timer = setTimeout(tryScroll, 100)
+    tryScroll()
     return () => { if (timer) clearTimeout(timer) }
-  }, [])
+  }, [weeks, currentWeekIndex])
 
   return (
     <div className="bg-gray-900">
