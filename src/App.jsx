@@ -9,16 +9,8 @@ import WhoopCallback from './pages/WhoopCallback'
 function App() {
   return (
     <div
-      className="bg-gray-900 text-gray-50 font-inter"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
+      className="flex flex-col bg-gray-900 text-gray-50 font-inter"
+      style={{ height: '100dvh', overflow: 'hidden' }}
     >
       <main
         className="flex-1 overflow-y-auto min-h-0"
