@@ -12,29 +12,10 @@ import {
 } from 'recharts'
 import Card from '../components/ui/Card'
 import SectionHeader from '../components/ui/SectionHeader'
-import EmptyState from '../components/ui/EmptyState'
 import { getDayOffset, PLAN_START_DATE_DEFAULT } from '../lib/trainingPlan'
 import { useIntervals } from '../hooks/useIntervals'
 import { useWhoop } from '../hooks/useWhoop'
 import { logWeightForDate } from '../lib/weight'
-
-// ── Icons ──────────────────────────────────────────────────────────────────
-
-function HeartbeatIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-    </svg>
-  )
-}
-
-function MoonIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  )
-}
 
 // ── Section 1: Weight Trend ────────────────────────────────────────────────
 
@@ -167,43 +148,7 @@ function WeightSection() {
   )
 }
 
-// ── Section 2: HRV Trend ──────────────────────────────────────────────────
-
-function HRVSection() {
-  const { connected, recoveryData } = useWhoop()
-  const todayHrv = recoveryData?.hrv ?? null
-
-  return (
-    <Card variant="default">
-      <SectionHeader title="HRV" />
-      {connected ? (
-        todayHrv != null ? (
-          <div className="py-2">
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-3xl font-black text-white">{todayHrv}</span>
-              <span className="text-sm text-gray-400">ms · today</span>
-            </div>
-            <p className="text-xs text-gray-600 mt-1">History builds as Whoop syncs daily readings</p>
-          </div>
-        ) : (
-          <EmptyState
-            icon={<HeartbeatIcon />}
-            title="No HRV data yet"
-            description="HRV will appear once Whoop syncs your readings"
-          />
-        )
-      ) : (
-        <EmptyState
-          icon={<HeartbeatIcon />}
-          title="No HRV data"
-          description="Connect your Whoop to see HRV trends"
-        />
-      )}
-    </Card>
-  )
-}
-
-// ── Section 3: Weekly Mileage ─────────────────────────────────────────────
+// ── Section 2: Weekly Mileage ─────────────────────────────────────────────
 
 function MileageSection() {
   const { activities } = useIntervals()
@@ -255,34 +200,6 @@ function MileageSection() {
   )
 }
 
-// ── Section 4: Sleep Trend ────────────────────────────────────────────────
-
-function SleepSection() {
-  const whoopConnected = useMemo(
-    () => Boolean(localStorage.getItem('kadence_whoop_access_token')),
-    []
-  )
-
-  return (
-    <Card variant="default">
-      <SectionHeader title="Sleep Score · 7 Days" />
-      {whoopConnected ? (
-        <EmptyState
-          icon={<MoonIcon />}
-          title="No sleep data"
-          description="Sleep data will appear here once Whoop syncs your readings"
-        />
-      ) : (
-        <EmptyState
-          icon={<MoonIcon />}
-          title="No sleep data"
-          description="Connect your Whoop to see 7-day sleep score trends"
-        />
-      )}
-    </Card>
-  )
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function Trends() {
@@ -290,9 +207,7 @@ export default function Trends() {
     <div className="px-4 pt-3 pb-6 space-y-4">
       <h1 className="text-2xl font-black text-white tracking-tight mb-2">Trends</h1>
       <WeightSection />
-      <HRVSection />
       <MileageSection />
-      <SleepSection />
     </div>
   )
 }

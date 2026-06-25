@@ -9,6 +9,11 @@ import WhoopCallback from './pages/WhoopCallback'
 function App() {
   return (
     <div className="flex flex-col h-full bg-gray-900 text-gray-50 font-inter">
+      {/* Covers the safe-area-inset-top region so scrolled content never bleeds behind the status bar */}
+      <div
+        className="fixed top-0 left-0 right-0 bg-gray-900 z-30"
+        style={{ height: 'env(safe-area-inset-top, 0px)' }}
+      />
       <main
         className="flex-1 overflow-y-auto min-h-0"
         style={{
