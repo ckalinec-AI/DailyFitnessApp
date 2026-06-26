@@ -12,6 +12,7 @@ import {
 } from '../lib/trainingPlan'
 import { useIntervals } from '../hooks/useIntervals'
 import { Badge } from '../components/ui'
+import WorkoutChart, { stepsToSegments, parseWorkoutSegments } from '../components/ui/WorkoutChart'
 
 const zoneVariant = { 1: 'muted', 2: 'recovery', 3: 'warning', 4: 'accent', 5: 'danger' }
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -196,12 +197,21 @@ function WorkoutSheet({ day, onClose }) {
 
   if (!day) return null
 
-  const { date, workout, activity, isRaceDay } = day
+  const { date, workout, activity, event, isRaceDay } = day
   const duration = workout?.duration ?? (workout ? getWorkoutDuration(workout) : null)
   const zone = (workout && workout._source !== 'intervals') ? getPrimaryZone(workout) : null
   const summary = (workout && workout._source !== 'intervals') ? getStructureSummary(workout) : null
   const actMiles = activity ? metersToMiles(activity.distance) : null
   const actDuration = activity?.moving_time ? Math.round(activity.moving_time / 60) : null
+
+  const segments = (() => {
+    if (event?.description) {
+      const parsed = parseWorkoutSegments(event.description)
+      if (parsed.length) return parsed
+    }
+    if (workout?.steps?.length) return stepsToSegments(workout.steps)
+    return []
+  })()
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -253,6 +263,12 @@ function WorkoutSheet({ day, onClose }) {
                   )}
                   {zone && <ZoneBadge zone={zone} />}
                 </div>
+
+                {segments.length > 0 && (
+                  <div className="mb-4">
+                    <WorkoutChart segments={segments} />
+                  </div>
+                )}
 
                 {summary && (
                   <div className="bg-gray-800 rounded-xl p-3 mb-4">
@@ -310,23 +326,25 @@ export default function TrainingPlan() {
     const todayStr = format(new Date(), 'yyyy-MM-dd')
     const raceDateStr = format(getDateForOffset(startDate, RACE_DAY_OFFSET), 'yyyy-MM-dd')
 
-    // First Sunday on or before plan start
+    // First Monday on or before plan start
     const planStartObj = new Date(startDate + 'T12:00:00')
-    const startDow = planStartObj.getDay()
-    const firstSunday = new Date(planStartObj)
-    firstSunday.setDate(firstSunday.getDate() - startDow)
+    const startDow = planStartObj.getDay() // 0=Sun,1=Mon,…
+    const daysToMonday = startDow === 0 ? 6 : startDow - 1
+    const firstMonday = new Date(planStartObj)
+    firstMonday.setDate(firstMonday.getDate() - daysToMonday)
 
-    // Last Saturday on or after plan end
+    // Last Sunday on or after plan end
     const planEndObj = getDateForOffset(startDate, PLAN_END_OFFSET)
     const endDow = planEndObj.getDay()
-    const lastSaturday = new Date(planEndObj)
-    if (endDow !== 6) lastSaturday.setDate(lastSaturday.getDate() + (6 - endDow))
+    const lastSunday = new Date(planEndObj)
+    const daysToSunday = endDow === 0 ? 0 : 7 - endDow
+    lastSunday.setDate(lastSunday.getDate() + daysToSunday)
 
     const result = []
-    const cursor = new Date(firstSunday)
+    const cursor = new Date(firstMonday)
     let weekNum = 1
 
-    while (cursor <= lastSaturday) {
+    while (cursor <= lastSunday) {
       const days = []
       for (let d = 0; d < 7; d++) {
         const date = new Date(cursor)
@@ -342,6 +360,7 @@ export default function TrainingPlan() {
           dateStr,
           workout,
           activity,
+          event: evt,
           isRest: !workout,
           isToday: dateStr === todayStr,
           isPast: dateStr < todayStr,
