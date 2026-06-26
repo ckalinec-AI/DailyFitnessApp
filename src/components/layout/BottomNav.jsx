@@ -47,7 +47,7 @@ export default function BottomNav() {
       className="bg-gray-900 border-t border-gray-800"
       style={{
         flexShrink: 0,
-        paddingBottom: '1px',
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))',
       }}
     >
       <div className="flex items-center justify-around h-16 px-2">

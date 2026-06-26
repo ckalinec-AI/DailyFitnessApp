@@ -8,6 +8,7 @@
   html {
     @apply bg-gray-900;
     overflow: hidden;
+    height: 100vh;
     overscroll-behavior: none;
   }
 
@@ -16,6 +17,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow: hidden;
+    height: 100vh;
     overscroll-behavior: none;
     touch-action: none;
   }
@@ -52,8 +54,6 @@
 
   #root {
     height: 100vh;
-    height: -webkit-fill-available;
-    height: 100dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;

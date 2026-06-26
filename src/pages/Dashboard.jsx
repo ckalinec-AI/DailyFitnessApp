@@ -4,32 +4,12 @@ import { usePlan } from '../hooks/usePlan'
 import { useWhoop } from '../hooks/useWhoop'
 import { useIntervals } from '../hooks/useIntervals'
 import { useWeather } from '../hooks/useWeather'
-import {
-  HR_ZONES,
-  PLAN_START_DATE_DEFAULT,
-  PLAN_END_OFFSET,
-  getDayOffset,
-  getWorkoutForOffset,
-  getDateForOffset,
-} from '../lib/trainingPlan'
-import WorkoutChart, { stepsToSegments, parseWorkoutSegments } from '../components/ui/WorkoutChart'
+import WorkoutChart, { parseWorkoutSegments } from '../components/ui/WorkoutChart'
 import {
   Card,
-  Badge,
   SectionHeader,
   MetricRing,
-  NudgeBanner,
 } from '../components/ui'
-
-const zoneBadgeVariant = { 1: 'muted', 2: 'recovery', 3: 'warning', 4: 'accent', 5: 'danger' }
-
-const intensityLabel = {
-  rest:       { text: 'Rest',       variant: 'muted' },
-  recovery:   { text: 'Recovery',   variant: 'muted' },
-  endurance:  { text: 'Endurance',  variant: 'recovery' },
-  tempo:      { text: 'Tempo',      variant: 'warning' },
-  threshold:  { text: 'Threshold',  variant: 'accent' },
-}
 
 function ChevronIcon({ expanded }) {
   return (
@@ -60,12 +40,11 @@ export default function Dashboard() {
   const todayEvent = eventsByDate[todayStr] ?? null
   const todayActivity = activitiesByDate[todayStr] ?? null
 
-  // Ride duration for the weather window: intervals.icu moving_time (seconds) or plan duration (minutes)
+  // Ride duration for the weather window
   const rideDurationMins = useMemo(() => {
     if (todayEvent?.moving_time > 0) return Math.round(todayEvent.moving_time / 60)
-    if (plan.todayDetails?.duration > 0) return plan.todayDetails.duration
     return 60
-  }, [todayEvent, plan.todayDetails])
+  }, [todayEvent])
 
   const { weather, loading: weatherLoading, error: weatherError, refresh: refreshWeather } = useWeather({ rideDurationMins })
   const recovery = {
@@ -76,7 +55,6 @@ export default function Dashboard() {
     strain:   whoop.strainData?.strain     ?? null,
     synced:   whoop.lastSyncedMins         ?? null,
   }
-  const [nudgeDismissed, setNudgeDismissed] = useState(false)
   const [todayExpanded, setTodayExpanded] = useState(false)
 
   // Pull-to-refresh
@@ -106,19 +84,8 @@ export default function Dashboard() {
     setPullDist(0)
   }
 
-  const nudge = (() => {
-    if (!plan.todayDetails || nudgeDismissed || recovery.score == null) return null
-    const { intensity } = plan.todayDetails
-    if (recovery.score <= 33 && (intensity === 'threshold' || intensity === 'tempo')) {
-      return { type: 'warning', message: "Your body's working hard overnight. Zone 2 today would still build fitness." }
-    }
-    if (recovery.score >= 67 && intensity === 'threshold') {
-      return { type: 'positive', message: "You're primed — strong recovery + a hard session. Execute cleanly." }
-    }
-    return null
-  })()
-
-  const { todayDetails, weekNumber, daysToRace, isRestDay } = plan
+  const { daysToRace } = plan
+  const isRestDay = !todayActivity && !todayEvent && events.length > 0
 
   // Zone chart segments for today's planned workout
   const todaySegments = useMemo(() => {
@@ -126,54 +93,30 @@ export default function Dashboard() {
       const parsed = parseWorkoutSegments(todayEvent.description)
       if (parsed.length) return parsed
     }
-    if (todayDetails?.workout?.steps) return stepsToSegments(todayDetails.workout.steps)
     return []
-  }, [todayEvent, todayDetails])
+  }, [todayEvent])
 
-  // Next upcoming workout (intervals.icu first, then JSON plan fallback)
+  // Next upcoming workout from intervals.icu only
   const nextWorkoutData = useMemo(() => {
     const upcoming = events
       .filter(e => e.start_date_local && e.start_date_local.slice(0, 10) > todayStr)
       .sort((a, b) => a.start_date_local.localeCompare(b.start_date_local))
 
-    let result = null
+    if (upcoming.length === 0) return null
 
-    if (upcoming.length > 0) {
-      const evt = upcoming[0]
-      const dateStr = evt.start_date_local.slice(0, 10)
-      const offset = getDayOffset(PLAN_START_DATE_DEFAULT, new Date(dateStr + 'T12:00:00'))
-      const jsonW = getWorkoutForOffset(offset)
-      const segs = jsonW ? stepsToSegments(jsonW.steps) : parseWorkoutSegments(evt.description)
-      result = { name: evt.name, dateStr, movingTime: evt.moving_time, segments: segs }
-    } else {
-      const todayOff = getDayOffset(PLAN_START_DATE_DEFAULT)
-      for (let off = todayOff + 1; off <= PLAN_END_OFFSET; off++) {
-        const w = getWorkoutForOffset(off)
-        if (w) {
-          const date = getDateForOffset(PLAN_START_DATE_DEFAULT, off)
-          result = {
-            name: w.name,
-            dateStr: format(date, 'yyyy-MM-dd'),
-            movingTime: null,
-            segments: stepsToSegments(w.steps),
-          }
-          break
-        }
-      }
-    }
-
-    if (!result) return null
-
+    const evt = upcoming[0]
+    const dateStr = evt.start_date_local.slice(0, 10)
+    const segments = parseWorkoutSegments(evt.description)
     const diff = differenceInCalendarDays(
-      new Date(result.dateStr + 'T12:00:00'),
+      new Date(dateStr + 'T12:00:00'),
       new Date(todayStr + 'T12:00:00')
     )
-    result.dateLabel =
+    const dateLabel =
       diff === 1 ? 'Tomorrow'
-      : diff < 7 ? format(new Date(result.dateStr + 'T12:00:00'), 'EEEE')
-      : format(new Date(result.dateStr + 'T12:00:00'), 'MMM d')
+      : diff < 7 ? format(new Date(dateStr + 'T12:00:00'), 'EEEE')
+      : format(new Date(dateStr + 'T12:00:00'), 'MMM d')
 
-    return result
+    return { name: evt.name, dateStr, movingTime: evt.moving_time, segments, dateLabel }
   }, [events, todayStr])
 
   return (
@@ -210,15 +153,6 @@ export default function Dashboard() {
           </span>
           <div className="h-px flex-1 bg-white/5" />
         </div>
-      )}
-
-      {/* Nudge banner */}
-      {nudge && (
-        <NudgeBanner
-          type={nudge.type}
-          message={nudge.message}
-          onDismiss={() => setNudgeDismissed(true)}
-        />
       )}
 
       {/* Recovery card */}
@@ -354,16 +288,12 @@ export default function Dashboard() {
                   <WorkoutChart segments={todaySegments} />
                 </div>
               )}
-              {(todayEvent || todayDetails) && (
+              {todayEvent && (
                 <>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-1">Planned</p>
-                  <p className="text-sm font-bold text-white mb-1">
-                    {todayEvent?.name ?? todayDetails?.workout?.name}
-                  </p>
-                  {(todayEvent?.description || todayDetails?.workout?.description) && (
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      {todayEvent?.description ?? todayDetails?.workout?.description}
-                    </p>
+                  <p className="text-sm font-bold text-white mb-1">{todayEvent.name}</p>
+                  {todayEvent.description && (
+                    <p className="text-xs text-gray-500 leading-relaxed">{todayEvent.description}</p>
                   )}
                 </>
               )}
@@ -404,47 +334,9 @@ export default function Dashboard() {
           </div>
         </Card>
 
-      ) : todayDetails ? (
-        <Card variant="default">
-          <SectionHeader title="Today's Workout" />
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex-1 min-w-0">
-              <h3 className="text-base font-bold text-white leading-tight">{todayDetails.workout.name}</h3>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-sm text-gray-400">{todayDetails.duration} min</span>
-                {todayDetails.primaryZone && (
-                  <>
-                    <span className="text-gray-700">·</span>
-                    <Badge variant={zoneBadgeVariant[todayDetails.primaryZone] ?? 'accent'} size="sm">
-                      {HR_ZONES[todayDetails.primaryZone]?.name}
-                    </Badge>
-                  </>
-                )}
-              </div>
-            </div>
-            {intensityLabel[todayDetails.intensity] && (
-              <Badge variant={intensityLabel[todayDetails.intensity].variant} size="sm" className="shrink-0">
-                {intensityLabel[todayDetails.intensity].text}
-              </Badge>
-            )}
-          </div>
-          {todaySegments.length > 0 && (
-            <div className="mb-3">
-              <WorkoutChart segments={todaySegments} />
-            </div>
-          )}
-          {todayDetails.workout.description && (
-            <p className="text-xs text-gray-500 leading-relaxed">
-              {todayDetails.workout.description}
-            </p>
-          )}
-        </Card>
-
       ) : (
         <Card variant="default">
-          <p className="text-sm text-gray-500 text-center py-4">
-            {plan.dayOffset < 0 ? 'Plan starts June 4, 2026' : 'Plan complete — great work.'}
-          </p>
+          <p className="text-sm text-gray-500 text-center py-4">No workout scheduled.</p>
         </Card>
       )}
 
