@@ -2,6 +2,7 @@
 #   WHOOP_CLIENT_SECRET   — server-side Whoop OAuth secret (never expose in client code)
 #   VITE_WHOOP_CLIENT_ID  — Whoop OAuth client ID (safe to expose in client)
 #   VITE_WHOOP_REDIRECT_URI — must match the redirect URI registered in your Whoop app
+#   PIRATE_WEATHER_API_KEY — server-side Pirate Weather key (never expose in client code)
 
 [build]
   command = "npm run build"

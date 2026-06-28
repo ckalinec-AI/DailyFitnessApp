@@ -1,41 +1,29 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { getItem, setItem } from '../lib/storage'
 
-const CACHE_KEY = 'kadence_weather_cache_v4'
+const CACHE_KEY = 'kadence_weather_cache_v5'
 const LOCATION_KEY = 'kadence_weather_location'
 const CACHE_TTL_MS = 30 * 60 * 1000
 const LOCATION_TTL_MS = 12 * 60 * 60 * 1000
-const BUFFER_MINS = 60 // "get ready + possible late start" buffer after ride end
+const BUFFER_MINS = 60
 
-const WMO = {
-  0:  { label: 'Clear sky',          icon: '☀️' },
-  1:  { label: 'Mainly clear',       icon: '🌤' },
-  2:  { label: 'Partly cloudy',      icon: '⛅' },
-  3:  { label: 'Overcast',           icon: '☁️' },
-  45: { label: 'Fog',                icon: '🌫' },
-  48: { label: 'Icy fog',            icon: '🌫' },
-  51: { label: 'Light drizzle',      icon: '🌦' },
-  53: { label: 'Drizzle',            icon: '🌦' },
-  55: { label: 'Heavy drizzle',      icon: '🌧' },
-  61: { label: 'Light rain',         icon: '🌧' },
-  63: { label: 'Rain',               icon: '🌧' },
-  65: { label: 'Heavy rain',         icon: '🌧' },
-  71: { label: 'Light snow',         icon: '🌨' },
-  73: { label: 'Snow',               icon: '❄️' },
-  75: { label: 'Heavy snow',         icon: '❄️' },
-  77: { label: 'Snow grains',        icon: '🌨' },
-  80: { label: 'Light showers',      icon: '🌦' },
-  81: { label: 'Showers',            icon: '🌧' },
-  82: { label: 'Heavy showers',      icon: '⛈' },
-  85: { label: 'Snow showers',       icon: '🌨' },
-  86: { label: 'Heavy snow showers', icon: '🌨' },
-  95: { label: 'Thunderstorm',       icon: '⛈' },
-  96: { label: 'Thunderstorm + hail',icon: '⛈' },
-  99: { label: 'Heavy hail storm',   icon: '⛈' },
+const PW_ICONS = {
+  'clear-day':           { label: 'Clear',         icon: '☀️' },
+  'clear-night':         { label: 'Clear',         icon: '🌙' },
+  'rain':                { label: 'Rain',           icon: '🌧' },
+  'snow':                { label: 'Snow',           icon: '❄️' },
+  'sleet':               { label: 'Sleet',         icon: '🌨' },
+  'wind':                { label: 'Windy',          icon: '💨' },
+  'fog':                 { label: 'Fog',            icon: '🌫' },
+  'cloudy':              { label: 'Overcast',       icon: '☁️' },
+  'partly-cloudy-day':   { label: 'Partly Cloudy', icon: '⛅' },
+  'partly-cloudy-night': { label: 'Partly Cloudy', icon: '🌤' },
+  'thunderstorm':        { label: 'Thunderstorm',  icon: '⛈' },
+  'tornado':             { label: 'Tornado',        icon: '🌪' },
 }
 
-function getWmo(code) {
-  return WMO[code] ?? { label: 'Unknown', icon: '🌡' }
+function getPwIcon(iconStr) {
+  return PW_ICONS[iconStr] ?? { label: iconStr ?? 'Unknown', icon: '🌡' }
 }
 
 function degreesToCompass(deg) {
@@ -57,55 +45,50 @@ function fmtTime(date) {
   return m === 0 ? `${h} ${ampm}` : `${h}:${m.toString().padStart(2, '0')} ${ampm}`
 }
 
-// Derive precipitation stats for the ride window from raw hourly arrays.
-// Window = now → now + rideDurationMins + BUFFER_MINS
 function calcRideWindow(raw, rideDurationMins) {
   const now = new Date()
-  const nowHour = now.getHours()
+  const nowMs = now.getTime()
   const windowMins = rideDurationMins + BUFFER_MINS
-  const endDate = new Date(now.getTime() + windowMins * 60 * 1000)
-  // Include the current partial hour plus all hours up to endDate's hour
-  const endHour = Math.min(endDate.getHours(), 23)
-  // Slice is inclusive of nowHour, exclusive of endHour+1
-  const numHours = Math.max(1, endHour - nowHour + 1)
+  const endDate = new Date(nowMs + windowMins * 60 * 1000)
+  const windowEndMs = endDate.getTime()
 
-  const probSlice = (raw.hourlyPrecipProb ?? []).slice(nowHour, nowHour + numHours)
-  const amtSlice  = (raw.hourlyPrecipAmt  ?? []).slice(nowHour, nowHour + numHours)
+  const hourly = raw.hourlyData ?? []
+  const windowHours = hourly.filter(h => h.time * 1000 >= nowMs && h.time * 1000 <= windowEndMs)
 
-  const rawMaxPct = probSlice.length ? Math.max(...probSlice) : 0
+  const rawMaxPct = windowHours.length ? Math.max(...windowHours.map(h => h.precipProbability * 100)) : 0
   const precipPct = rawMaxPct < 10 ? 0 : Math.round(rawMaxPct / 5) * 5
 
-  const totalIn = amtSlice.reduce((s, v) => s + (v ?? 0), 0)
+  const totalIn = windowHours.reduce((s, h) => s + (h.precipIntensity ?? 0), 0)
   const precipIn = totalIn < 0.01 ? 0 : parseFloat(totalIn.toFixed(2))
 
   const windowLabel = `${fmtTime(now)} – ${fmtTime(endDate)}`
 
-  const tempArr = raw.hourlyTemperature2m ?? []
-  const tempEnd = tempArr.length > endHour ? Math.round(tempArr[endHour]) : null
+  const endEntry = hourly.find(h => h.time * 1000 >= nowMs + rideDurationMins * 60 * 1000)
+  const tempEnd = endEntry ? Math.round(endEntry.temperature) : null
 
   return { precipPct, precipIn, windowLabel, windowMins, tempEnd }
 }
 
-// rideDurationMins: planned ride length; pass 0 or omit if no ride today
 export function useWeather({ rideDurationMins = 60 } = {}) {
   const [raw, setRaw] = useState(() => getItem(CACHE_KEY, null))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Recalculate window stats whenever ride duration or raw data changes
   const weather = useMemo(() => {
     if (!raw) return null
     const window = calcRideWindow(raw, rideDurationMins)
     return {
-      tempF:      raw.tempF,
-      condition:  raw.condition,
-      icon:       raw.icon,
-      cloudPct:   raw.cloudPct,
-      cloudLabel: raw.cloudLabel,
-      windMph:    raw.windMph,
-      windDir:    raw.windDir,
+      tempF:           raw.tempF,
+      condition:       raw.condition,
+      icon:            raw.icon,
+      cloudPct:        raw.cloudPct,
+      cloudLabel:      raw.cloudLabel,
+      windMph:         raw.windMph,
+      windDir:         raw.windDir,
+      stormDistanceMi: raw.stormDistanceMi,
+      stormBearing:    raw.stormBearing,
       ...window,
-      fetchedAt:  raw.fetchedAt,
+      fetchedAt:       raw.fetchedAt,
     }
   }, [raw, rideDurationMins])
 
@@ -135,47 +118,29 @@ export function useWeather({ rideDurationMins = 60 } = {}) {
         setItem(LOCATION_KEY, { lat, lon, fetchedAt: Date.now() })
       }
 
-      const url = new URL('https://api.open-meteo.com/v1/forecast')
-      url.searchParams.set('latitude', lat)
-      url.searchParams.set('longitude', lon)
-      url.searchParams.set('current', [
-        'temperature_2m',
-        'weather_code',
-        'wind_speed_10m',
-        'wind_direction_10m',
-        'cloud_cover',
-      ].join(','))
-      url.searchParams.set('hourly', [
-        'precipitation_probability',
-        'precipitation',
-        'temperature_2m',
-      ].join(','))
-      url.searchParams.set('temperature_unit', 'fahrenheit')
-      url.searchParams.set('wind_speed_unit', 'mph')
-      url.searchParams.set('precipitation_unit', 'inch')
-      url.searchParams.set('forecast_days', '1')
-      url.searchParams.set('timezone', 'auto')
-
-      const res = await fetch(url.toString())
+      const res = await fetch('/.netlify/functions/pirate-weather', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lon }),
+      })
       if (!res.ok) throw new Error(`Weather fetch failed: ${res.status}`)
       const json = await res.json()
 
-      const cur = json.current
-      const wmo = getWmo(cur.weather_code)
+      const cur = json.currently
+      const pw = getPwIcon(cur.icon)
 
       const rawData = {
-        tempF:    Math.round(cur.temperature_2m),
-        condition: wmo.label,
-        icon:     wmo.icon,
-        cloudPct:   Math.round(cur.cloud_cover ?? 0),
-        cloudLabel: cloudLabel(Math.round(cur.cloud_cover ?? 0)),
-        windMph:  Math.round(cur.wind_speed_10m),
-        windDir:  degreesToCompass(cur.wind_direction_10m ?? 0),
-        // Store full 24-hour arrays so window can be recalculated without refetching
-        hourlyPrecipProb:    json.hourly?.precipitation_probability ?? [],
-        hourlyPrecipAmt:     json.hourly?.precipitation ?? [],
-        hourlyTemperature2m: json.hourly?.temperature_2m ?? [],
-        fetchedAt: Date.now(),
+        tempF:           Math.round(cur.temperature),
+        condition:       pw.label,
+        icon:            pw.icon,
+        cloudPct:        Math.round((cur.cloudCover ?? 0) * 100),
+        cloudLabel:      cloudLabel(Math.round((cur.cloudCover ?? 0) * 100)),
+        windMph:         Math.round(cur.windSpeed ?? 0),
+        windDir:         degreesToCompass(cur.windBearing ?? 0),
+        stormDistanceMi: cur.nearestStormDistance ?? null,
+        stormBearing:    cur.nearestStormBearing ?? null,
+        hourlyData:      json.hourly?.data ?? [],
+        fetchedAt:       Date.now(),
         lat,
         lon,
       }

@@ -25,6 +25,11 @@ function ChevronIcon({ expanded }) {
   )
 }
 
+function compassFromDeg(deg) {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+  return dirs[Math.round(deg / 45) % 8]
+}
+
 function formatDuration(secs) {
   const h = Math.floor(secs / 3600)
   const m = Math.round((secs % 3600) / 60)
@@ -241,6 +246,17 @@ export default function Dashboard() {
               <div className="flex flex-col items-center gap-1.5">
                 <span className="text-xl font-black text-white leading-none">{weather.precipIn}"</span>
                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Expected</span>
+              </div>
+            )}
+
+            {weather.stormDistanceMi != null && weather.stormDistanceMi < 75 && (
+              <div className="flex flex-col items-center gap-1.5">
+                <span className="text-xl font-black text-white leading-none">
+                  {Math.round(weather.stormDistanceMi)}<span className="text-xs font-semibold"> mi</span>
+                </span>
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
+                  {compassFromDeg(weather.stormBearing)} Storm
+                </span>
               </div>
             )}
 
