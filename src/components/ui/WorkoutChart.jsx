@@ -42,33 +42,60 @@ export function parseWorkoutSegments(description) {
   if (!description) return []
   const segs = []
 
-  for (const raw of description.split('\n')) {
+  // Strip HTML tags and decode common entities so raw HTML descriptions work
+  const text = description.replace(/<[^>]+>/g, ' ').replace(/&[a-z#\d]+;/gi, ' ')
+  const DUR = 'm(?:in(?:s|utes)?)?'
+  const REST_KW = '(?:easy|rec(?:overy)?|rest|spin|active)'
+
+  for (const raw of text.split('\n')) {
     const line = raw.trim()
     if (!line) continue
 
-    // "3×5 min Z3 / 3 min Z1" or "3x5min Z3"
-    const rptMatch = line.match(/^(\d+)\s*[×xX]\s*(\d+(?:\.\d+)?)\s*m(?:in)?\s+[Zz](\d)/i)
+    // "3×5 min Z3 / 3 min Z1" — no ^ anchor so labeled lines like "Main: 3×…" work
+    const rptMatch = line.match(new RegExp(`(\\d+)\\s*[×xX]\\s*(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+[Zz](\\d)`, 'i'))
     if (rptMatch) {
       const reps = parseInt(rptMatch[1])
       const mins = parseFloat(rptMatch[2])
       const zone = parseInt(rptMatch[3])
-      const recMatch = line.match(/[/+]\s*(\d+(?:\.\d+)?)\s*m(?:in)?\s+[Zz](\d)/i)
-      for (let i = 0; i < reps; i++) {
-        segs.push({ minutes: mins, zone })
-        if (recMatch) segs.push({ minutes: parseFloat(recMatch[1]), zone: parseInt(recMatch[2]) })
+      // Recovery with explicit zone: "/ 3 min Z1"
+      const recMatch = line.match(new RegExp(`[/+]\\s*(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+[Zz](\\d)`, 'i'))
+      if (recMatch) {
+        for (let i = 0; i < reps; i++) {
+          segs.push({ minutes: mins, zone })
+          segs.push({ minutes: parseFloat(recMatch[1]), zone: parseInt(recMatch[2]) })
+        }
+        continue
       }
+      // Recovery with keyword: "/ 3 min easy" → Z1
+      const restKw = line.match(new RegExp(`[/+]\\s*(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+${REST_KW}`, 'i'))
+      if (restKw) {
+        for (let i = 0; i < reps; i++) {
+          segs.push({ minutes: mins, zone })
+          segs.push({ minutes: parseFloat(restKw[1]), zone: 1 })
+        }
+        continue
+      }
+      // No recovery found — just push the work reps
+      for (let i = 0; i < reps; i++) segs.push({ minutes: mins, zone })
       continue
     }
 
-    // "10 min Z2" or "10m Z3"
-    const simple = line.match(/(\d+(?:\.\d+)?)\s*m(?:in)?\s+[Zz](\d)/i)
+    // "10 min Z2" or "10m Z3" or "10 minutes Z4"
+    const simple = line.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+[Zz](\\d)`, 'i'))
     if (simple) {
       segs.push({ minutes: parseFloat(simple[1]), zone: parseInt(simple[2]) })
       continue
     }
 
+    // "5 min easy" / "4 min recovery" / "3 min rest" → Z1
+    const rec = line.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+${REST_KW}`, 'i'))
+    if (rec) {
+      segs.push({ minutes: parseFloat(rec[1]), zone: 1 })
+      continue
+    }
+
     // "Warmup 10 min" / "Cooldown 15 min" → Z2
-    const warm = line.match(/(?:warm|cool|easy)\w*\s+(\d+)\s*m(?:in)?/i)
+    const warm = line.match(new RegExp(`(?:warm|cool)\\w*\\s+(\\d+)\\s*${DUR}`, 'i'))
     if (warm) segs.push({ minutes: parseInt(warm[1]), zone: 2 })
   }
 
