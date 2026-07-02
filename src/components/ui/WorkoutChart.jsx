@@ -37,68 +37,74 @@ export function stepsToSegments(steps) {
   return segs
 }
 
-// Parse intervals.icu description text into segments (best-effort)
+// Parse intervals.icu description text into segments (best-effort).
+// Splits into per-segment chunks (Warmup / Main Set Nx / Cooldown / bare
+// recovery lines) so a restated duration ("15m ... 15 min warm-up") isn't
+// double-counted, and pulls exactly one duration+zone out of each chunk.
 export function parseWorkoutSegments(description) {
   if (!description) return []
-  const segs = []
+  let text = description.replace(/<[^>]+>/g, ' ').replace(/&[a-z#\d]+;/gi, ' ')
 
-  // Strip HTML tags and decode common entities so raw HTML descriptions work
-  const text = description.replace(/<[^>]+>/g, ' ').replace(/&[a-z#\d]+;/gi, ' ')
-  const DUR = 'm(?:in(?:s|utes)?)?'
-  const REST_KW = '(?:easy|rec(?:overy)?|rest|spin|active)'
+  // Prefer the structured breakdown over any summary sentence that precedes it
+  const labelMatch = text.match(/\bwarm[-\s]?up\b|\bmain\s*set\b|\bcool[-\s]?down\b/i)
+  if (labelMatch) text = text.slice(labelMatch.index)
 
-  for (const raw of text.split('\n')) {
-    const line = raw.trim()
-    if (!line) continue
+  const chunks = text
+    .split(/\n+|(?=\bwarm[-\s]?up\b|\bmain\s*set\s*\d+\s*[x×X]|\bcool[-\s]?down\b|(?:[.]\s*-\s*\d))/i)
+    .map(c => c.trim())
+    .filter(Boolean)
 
-    // "3×5 min Z3 / 3 min Z1" — no ^ anchor so labeled lines like "Main: 3×…" work
-    const rptMatch = line.match(new RegExp(`(\\d+)\\s*[×xX]\\s*(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+[Zz](\\d)`, 'i'))
-    if (rptMatch) {
-      const reps = parseInt(rptMatch[1])
-      const mins = parseFloat(rptMatch[2])
-      const zone = parseInt(rptMatch[3])
-      // Recovery with explicit zone: "/ 3 min Z1"
-      const recMatch = line.match(new RegExp(`[/+]\\s*(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+[Zz](\\d)`, 'i'))
-      if (recMatch) {
-        for (let i = 0; i < reps; i++) {
-          segs.push({ minutes: mins, zone })
-          segs.push({ minutes: parseFloat(recMatch[1]), zone: parseInt(recMatch[2]) })
-        }
-        continue
-      }
-      // Recovery with keyword: "/ 3 min easy" → Z1
-      const restKw = line.match(new RegExp(`[/+]\\s*(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+${REST_KW}`, 'i'))
-      if (restKw) {
-        for (let i = 0; i < reps; i++) {
-          segs.push({ minutes: mins, zone })
-          segs.push({ minutes: parseFloat(restKw[1]), zone: 1 })
-        }
-        continue
-      }
-      // No recovery found — just push the work reps
-      for (let i = 0; i < reps; i++) segs.push({ minutes: mins, zone })
-      continue
-    }
+  const DUR = /(\d+)\s*[x×X]\s*-?\s*(\d+(?:\.\d+)?)\s*m(?:in(?:s|utes)?)?\b|(\d+(?:\.\d+)?)\s*m(?:in(?:s|utes)?)?\b/i
+  const REST_KW = 'easy|rec(?:overy)?|\\brest\\b|\\bspin\\b|active'
 
-    // "10 min Z2" or "10m Z3" or "10 minutes Z4"
-    const simple = line.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+[Zz](\\d)`, 'i'))
-    if (simple) {
-      segs.push({ minutes: parseFloat(simple[1]), zone: parseInt(simple[2]) })
-      continue
-    }
-
-    // "5 min easy" / "4 min recovery" / "3 min rest" → Z1
-    const rec = line.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${DUR}\\s+${REST_KW}`, 'i'))
-    if (rec) {
-      segs.push({ minutes: parseFloat(rec[1]), zone: 1 })
-      continue
-    }
-
-    // "Warmup 10 min" / "Cooldown 15 min" → Z2
-    const warm = line.match(new RegExp(`(?:warm|cool)\\w*\\s+(\\d+)\\s*${DUR}`, 'i'))
-    if (warm) segs.push({ minutes: parseInt(warm[1]), zone: 2 })
+  function inferZone(chunk) {
+    const z = chunk.match(/\bz\s*(\d)\b/i)
+    if (z) return parseInt(z[1], 10)
+    if (/warm[-\s]?up|cool[-\s]?down/i.test(chunk)) return 2
+    if (new RegExp(REST_KW, 'i').test(chunk)) return 1
+    if (/tempo/i.test(chunk)) return 3
+    if (/threshold|sst|sweet\s*spot/i.test(chunk)) return 4
+    if (/vo2|anaerobic/i.test(chunk)) return 5
+    return null
   }
 
+  const parsed = []
+  for (const chunk of chunks) {
+    const m = chunk.match(DUR)
+    if (!m) continue
+    const reps = m[1] ? parseInt(m[1], 10) : 1
+    const mins = parseFloat(m[2] ?? m[3])
+    const zone = inferZone(chunk) ?? 1
+
+    // Inline recovery within the same chunk: "/ 3 min Z1" or "/ 3 min easy"
+    const after = chunk.slice(m.index + m[0].length)
+    const recZ = after.match(/[/+]\s*(\d+(?:\.\d+)?)\s*m(?:in(?:s|utes)?)?\s+[Zz](\d)/i)
+    const recKw = !recZ && after.match(new RegExp(`[/+]\\s*(\\d+(?:\\.\\d+)?)\\s*m(?:in(?:s|utes)?)?\\s+(?:${REST_KW})`, 'i'))
+    const inlineRec = recZ
+      ? { minutes: parseFloat(recZ[1]), zone: parseInt(recZ[2]) }
+      : recKw ? { minutes: parseFloat(recKw[1]), zone: 1 } : null
+
+    parsed.push({ reps, mins, zone, inlineRec })
+  }
+  if (!parsed.length) return []
+
+  // Expand reps: inline recovery takes priority; otherwise pair a reps>1
+  // chunk with the very next single chunk (e.g. "Main Set 4x…" + "- 4m easy")
+  const segs = []
+  for (let i = 0; i < parsed.length; i++) {
+    const p = parsed[i]
+    if (p.reps > 1) {
+      const next = !p.inlineRec && parsed[i + 1]?.reps === 1 ? parsed[i + 1] : null
+      for (let r = 0; r < p.reps; r++) {
+        segs.push({ minutes: p.mins, zone: p.zone })
+        if (p.inlineRec) segs.push(p.inlineRec)
+        else if (next) segs.push({ minutes: next.mins, zone: next.zone })
+      }
+      if (next) i++
+    } else {
+      segs.push({ minutes: p.mins, zone: p.zone })
+    }
+  }
   return segs
 }
 
