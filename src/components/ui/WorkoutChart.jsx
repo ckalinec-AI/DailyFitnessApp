@@ -38,9 +38,13 @@ export function stepsToSegments(steps) {
 }
 
 // Parse intervals.icu description text into segments (best-effort).
-// Splits into per-segment chunks (Warmup / Main Set Nx / Cooldown / bare
-// recovery lines) so a restated duration ("15m ... 15 min warm-up") isn't
-// double-counted, and pulls exactly one duration+zone out of each chunk.
+// Splits on real newlines only — section labels ("Warmup", "Main Set 4x",
+// "Cooldown") always sit on their own line in practice. Splitting on the
+// keyword text itself (instead of newlines) would also fire on mid-sentence
+// restatements like "15 min warm-up" and fragment that line's own chunk.
+// A repeat header on its own line ("Main Set 4x") has no duration of its
+// own, so its multiplier is carried forward and applied to the group of
+// body lines that follow, until the next header/blank-separated section.
 export function parseWorkoutSegments(description) {
   if (!description) return []
   let text = description.replace(/<[^>]+>/g, ' ').replace(/&[a-z#\d]+;/gi, ' ')
@@ -49,13 +53,13 @@ export function parseWorkoutSegments(description) {
   const labelMatch = text.match(/\bwarm[-\s]?up\b|\bmain\s*set\b|\bcool[-\s]?down\b/i)
   if (labelMatch) text = text.slice(labelMatch.index)
 
-  const chunks = text
-    .split(/\n+|(?=\bwarm[-\s]?up\b|\bmain\s*set\s*\d+\s*[x×X]|\bcool[-\s]?down\b|(?:[.]\s*-\s*\d))/i)
-    .map(c => c.trim())
-    .filter(Boolean)
+  const chunks = text.split(/\n+/).map(c => c.trim()).filter(Boolean)
 
   const DUR = /(\d+)\s*[x×X]\s*-?\s*(\d+(?:\.\d+)?)\s*m(?:in(?:s|utes)?)?\b|(\d+(?:\.\d+)?)\s*m(?:in(?:s|utes)?)?\b/i
   const REST_KW = 'easy|rec(?:overy)?|\\brest\\b|\\bspin\\b|active'
+  // A line that is JUST a section label, optionally with a repeat count
+  // ("Warmup", "Main Set 4x", "Cooldown") or a bare "4x"/"3×" repeat marker
+  const HEADER_ONLY_RE = /^\s*(?:(?:warm[-\s]?up|cool[-\s]?down|main\s*set)\s*(?:(\d+)\s*[x×X])?|(\d+)\s*[x×X])\s*[:.]?\s*$/i
 
   function inferZone(chunk) {
     const z = chunk.match(/\bz\s*(\d)\b/i)
@@ -68,10 +72,9 @@ export function parseWorkoutSegments(description) {
     return null
   }
 
-  const parsed = []
-  for (const chunk of chunks) {
+  function parseBody(chunk) {
     const m = chunk.match(DUR)
-    if (!m) continue
+    if (!m) return null
     const reps = m[1] ? parseInt(m[1], 10) : 1
     const mins = parseFloat(m[2] ?? m[3])
     const zone = inferZone(chunk) ?? 1
@@ -84,25 +87,54 @@ export function parseWorkoutSegments(description) {
       ? { minutes: parseFloat(recZ[1]), zone: parseInt(recZ[2]) }
       : recKw ? { minutes: parseFloat(recKw[1]), zone: 1 } : null
 
-    parsed.push({ reps, mins, zone, inlineRec })
+    return { reps, mins, zone, inlineRec }
   }
-  if (!parsed.length) return []
 
-  // Expand reps: inline recovery takes priority; otherwise pair a reps>1
-  // chunk with the very next single chunk (e.g. "Main Set 4x…" + "- 4m easy")
+  // Group consecutive body lines under the most recent repeat header
+  const groups = []
+  let activeMultiplier = 1
+  let currentBodies = []
+
+  function flushGroup() {
+    if (currentBodies.length) groups.push({ multiplier: activeMultiplier, bodies: currentBodies })
+    currentBodies = []
+    activeMultiplier = 1
+  }
+
+  for (const chunk of chunks) {
+    const headerOnly = chunk.match(HEADER_ONLY_RE)
+    if (headerOnly) {
+      flushGroup()
+      const reps = headerOnly[1] ?? headerOnly[2]
+      activeMultiplier = reps ? parseInt(reps, 10) : 1
+      continue
+    }
+    const body = parseBody(chunk)
+    if (body) currentBodies.push(body)
+  }
+  flushGroup()
+  if (!groups.length) return []
+
+  // Expand each group: a body's own inline reps (e.g. "3×5 min Z3 / 3 min
+  // Z1") expands first, then the header's repeat count (if any) repeats
+  // the whole resulting sequence of body lines as a unit.
   const segs = []
-  for (let i = 0; i < parsed.length; i++) {
-    const p = parsed[i]
-    if (p.reps > 1) {
-      const next = !p.inlineRec && parsed[i + 1]?.reps === 1 ? parsed[i + 1] : null
-      for (let r = 0; r < p.reps; r++) {
-        segs.push({ minutes: p.mins, zone: p.zone })
-        if (p.inlineRec) segs.push(p.inlineRec)
-        else if (next) segs.push({ minutes: next.mins, zone: next.zone })
+  for (const group of groups) {
+    const expanded = []
+    for (const b of group.bodies) {
+      if (b.reps > 1) {
+        for (let r = 0; r < b.reps; r++) {
+          expanded.push({ minutes: b.mins, zone: b.zone })
+          if (b.inlineRec) expanded.push(b.inlineRec)
+        }
+      } else {
+        expanded.push({ minutes: b.mins, zone: b.zone })
       }
-      if (next) i++
+    }
+    if (group.multiplier > 1) {
+      for (let r = 0; r < group.multiplier; r++) segs.push(...expanded)
     } else {
-      segs.push({ minutes: p.mins, zone: p.zone })
+      segs.push(...expanded)
     }
   }
   return segs
