@@ -30,6 +30,18 @@ function compassFromDeg(deg) {
   return dirs[Math.round(deg / 45) % 8]
 }
 
+function WeatherStat({ icon, value, label }) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="flex items-center gap-1 leading-none">
+        {icon && <span className="text-lg leading-none">{icon}</span>}
+        <span className="text-xl font-black text-white leading-none">{value}</span>
+      </div>
+      <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest text-center leading-tight">{label}</span>
+    </div>
+  )
+}
+
 function formatDuration(secs) {
   const h = Math.floor(secs / 3600)
   const m = Math.round((secs % 3600) / 60)
@@ -213,51 +225,34 @@ export default function Dashboard() {
         ) : weather ? (
           <div className="flex justify-around items-start py-1">
 
-            <div className="flex flex-col items-center gap-1.5">
-              <div className="flex items-center gap-1 leading-none">
-                <span className="text-lg leading-none">{weather.icon}</span>
-                <span className="text-xl font-black text-white leading-none">
-                  {weather.tempEnd != null && Math.abs(weather.tempEnd - weather.tempF) > 3
-                    ? `${weather.tempF}–${weather.tempEnd}°`
-                    : `${weather.tempF}°`}
-                </span>
-              </div>
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest text-center leading-tight">{weather.condition}</span>
-            </div>
+            <WeatherStat
+              icon={weather.icon}
+              value={
+                weather.tempEnd != null && Math.abs(weather.tempEnd - weather.tempF) > 3
+                  ? `${weather.tempF}–${weather.tempEnd}°`
+                  : `${weather.tempF}°`
+              }
+              label={weather.condition}
+            />
 
-            <div className="flex flex-col items-center gap-1.5">
-              <span className="text-sm font-black text-white leading-tight text-center">
-                {weather.cloudLabel ?? '—'}
-              </span>
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Sky</span>
-            </div>
+            <WeatherStat value={weather.cloudLabel ?? '—'} label="Sky" />
 
-            <div className="flex flex-col items-center gap-1.5">
-              <span className="text-xl font-black text-white leading-none">{weather.windMph}<span className="text-xs font-semibold"> mph</span></span>
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">{weather.windDir} Wind</span>
-            </div>
+            <WeatherStat
+              value={<>{weather.windMph}<span className="text-xs font-semibold"> mph</span></>}
+              label={`${weather.windDir} Wind`}
+            />
 
-            <div className="flex flex-col items-center gap-1.5">
-              <span className="text-xl font-black text-white leading-none">{weather.precipPct}%</span>
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Rain</span>
-            </div>
+            <WeatherStat value={`${weather.precipPct}%`} label="Rain" />
 
             {weather.precipIn > 0 && (
-              <div className="flex flex-col items-center gap-1.5">
-                <span className="text-xl font-black text-white leading-none">{weather.precipIn}"</span>
-                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Expected</span>
-              </div>
+              <WeatherStat value={`${weather.precipIn}"`} label="Expected" />
             )}
 
             {weather.stormDistanceMi != null && weather.stormDistanceMi < 75 && (
-              <div className="flex flex-col items-center gap-1.5">
-                <span className="text-xl font-black text-white leading-none">
-                  {Math.round(weather.stormDistanceMi)}<span className="text-xs font-semibold"> mi</span>
-                </span>
-                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                  {compassFromDeg(weather.stormBearing)} Storm
-                </span>
-              </div>
+              <WeatherStat
+                value={<>{Math.round(weather.stormDistanceMi)}<span className="text-xs font-semibold"> mi</span></>}
+                label={`${compassFromDeg(weather.stormBearing)} Storm`}
+              />
             )}
 
           </div>
